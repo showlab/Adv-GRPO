@@ -17,7 +17,7 @@ import numpy as np
 import flow_grpo.prompts
 import flow_grpo.rewards
 from flow_grpo.stat_tracking import PerPromptStatTracker
-from flow_grpo.diffusers_patch.sd3_pipeline_with_logprob_fast import pipeline_with_logprob
+from flow_grpo.diffusers_patch.sd3_pipeline_with_logprob_fast import pipeline_with_logprob_new as pipeline_with_logprob
 from flow_grpo.diffusers_patch.sd3_sde_with_logprob import sde_step_with_logprob_new as sde_step_with_logprob
 from flow_grpo.diffusers_patch.train_dreambooth_lora_sd3 import encode_prompt
 import torch
@@ -49,8 +49,6 @@ class TextPromptDataset(Dataset):
         return len(self.prompts)
     
     def __getitem__(self, idx):
-        # print("index:", idx)
-        # print("prompt:",self.prompts[idx])
         return {"prompt": self.prompts[idx], "metadata": {}}
 
     @staticmethod
@@ -118,8 +116,6 @@ class DistributedKRepeatSampler(Sampler):
                 per_card_samples.append(shuffled_samples[start:end])
             
             # Return current replica's sample indices
-            # print("Sampler epoch:", self.epoch)
-            # print(per_card_samples[self.rank])
             yield per_card_samples[self.rank]
     
     def set_epoch(self, epoch):
@@ -206,7 +202,6 @@ def compute_log_prob(transformer, pipeline, sample, j, embeds, pooled_embeds, co
         prev_sample=sample["next_latents"][:, j].float(),
         noise_level=config.sample.noise_level,
     )
-    # import pdb; pdb.set_trace()
 
     return prev_sample, log_prob, prev_sample_mean, std_dev_t
 
@@ -256,8 +251,11 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
                     mini_num_image_per_prompt=1,
                     process_index=accelerator.process_index,
                     sample_num_steps=config.sample.num_steps,
+                    random_timestep = config.sample.random_timestep
                 )
         rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=False)
+        # import pdb; pdb.set_trace()
+        # rewards = reward_fn(images, prompts, prompt_metadata, only_strict=False)
         # yield to to make sure reward computation starts
         time.sleep(0)
         rewards, reward_metadata = rewards.result()
@@ -360,10 +358,13 @@ def main(_):
         gradient_accumulation_steps=config.train.gradient_accumulation_steps * config.sample.train_num_steps,
     )
     if accelerator.is_main_process:
-        wandb.init(
-            project="flow_grpo",
-            name=f"case_{config.case_name}", 
-        )
+        if config.wandb_init:
+            wandb.init(
+                project="flow_grpo",
+                name=f"case_{config.case_name}", 
+            )
+        else:
+            pass
         # accelerator.init_trackers(
         #     project_name="flow-grpo",
         #     config=config.to_dict(),
@@ -506,8 +507,6 @@ def main(_):
             batch_sampler=train_sampler,
             num_workers=1,
             collate_fn=TextPromptDataset.collate_fn,
-            # prefetch_factor=1, 
-            # persistent_workers=False
             # persistent_workers=True
         )
 
@@ -616,7 +615,7 @@ def main(_):
     train_iter = iter(train_dataloader)
 
     while True:
-        # #################### EVAL ####################
+        # # #################### EVAL ####################
         pipeline.transformer.eval()
         if epoch % config.eval_freq == 0:
             eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters)
@@ -627,7 +626,6 @@ def main(_):
         pipeline.transformer.eval()
         samples = []
         prompts = []
-        # import pdb; pdb.set_trace()
         for i in tqdm(
             range(config.sample.num_batches_per_epoch),
             desc=f"Epoch {epoch}: sampling",
@@ -636,9 +634,7 @@ def main(_):
         ):
             train_sampler.set_epoch(epoch * config.sample.num_batches_per_epoch + i)
             prompts, prompt_metadata = next(train_iter)
-            # print(prompts)
-            # import pdb; pdb.set_trace()
-            # prompts = ["photo of a girl, wearing respirator, long straight blonde hair in a ponytail"]
+            prompt_metadata = prompt_metadata*8
 
             prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
                 prompts, 
@@ -679,6 +675,7 @@ def main(_):
                         train_num_steps=config.sample.train_num_steps,
                         process_index=accelerator.process_index,
                         sample_num_steps=config.sample.num_steps,
+                        random_timestep = config.sample.random_timestep,
                     )
                     
                     # end = time.time()
@@ -700,6 +697,8 @@ def main(_):
                 prompt_ids.repeat(config.sample.mini_num_image_per_prompt,1), skip_special_tokens=True
             )
             rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=True)
+            # rewards = reward_fn(images, prompts, prompt_metadata, only_strict=True)
+            # import pdb; pdb.set_trace()
             # yield to to make sure reward computation starts
             time.sleep(0)
             samples.append(
@@ -718,7 +717,6 @@ def main(_):
                     "rewards": rewards,
                 }
             )
-        # import pdb; pdb.set_trace()
 
         # wait for all rewards to be computed
         for sample in tqdm(
@@ -744,7 +742,6 @@ def main(_):
             }
             for k in samples[0].keys()
         }
-        # import pdb; pdb.set_trace()
 
         if epoch % 10 == 0 and accelerator.is_main_process:
             # this is a hack to force wandb to log the images as JPEGs instead of PNGs
@@ -759,8 +756,7 @@ def main(_):
                     )
                     pil = pil.resize((config.resolution, config.resolution))
                     pil.save(os.path.join(tmpdir, f"{idx}.jpg"))  # 使用新的索引
-                    pil.save( f"{idx}.jpg")
-                    # import pdb; pdb.set_trace()
+                # import pdb; pdb.set_trace()
 
                 sampled_prompts = [prompts[i] for i in sample_indices]
                 sampled_rewards = [rewards['avg'][i] for i in sample_indices]
@@ -792,8 +788,7 @@ def main(_):
                 },
                 step=global_step,
             )
-        
-        # import pdb; pdb.set_trace()
+
         # per-prompt mean/std tracking
         if config.per_prompt_stat_tracking:
             # gather the prompts across processes
@@ -906,7 +901,8 @@ def main(_):
                         )
                         policy_loss = torch.mean(torch.maximum(unclipped_loss, clipped_loss))
                         if config.train.beta > 0:
-                            kl_loss = ((prev_sample_mean - prev_sample_mean_ref) ** 2).mean(dim=(1,2,3), keepdim=True) / (2 * std_dev_t ** 2)
+                            # kl_loss = ((prev_sample_mean - prev_sample_mean_ref) ** 2).mean(dim=(1,2,3), keepdim=True) / (2 * std_dev_t ** 2)
+                            kl_loss = ((prev_sample_mean - prev_sample_mean_ref) ** 2).mean(dim=(1,2,3), keepdim=True) 
                             kl_loss = torch.mean(kl_loss)
                             loss = policy_loss + config.train.beta * kl_loss
                         else:

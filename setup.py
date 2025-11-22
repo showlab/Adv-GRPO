@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="flow-grpo",
+    name="adv-grpo",
     version="0.0.1",
     packages=find_packages(),
     python_requires=">=3.10",
@@ -49,6 +49,7 @@ setup(
         "ml_collections",
         "sentencepiece",
         "openai",
+        "timm"
     ],
     extras_require={
         "dev": [

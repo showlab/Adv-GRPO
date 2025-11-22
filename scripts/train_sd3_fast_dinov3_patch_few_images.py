@@ -17,7 +17,7 @@ import numpy as np
 import flow_grpo.prompts
 import flow_grpo.rewards
 from flow_grpo.stat_tracking import PerPromptStatTracker
-from flow_grpo.diffusers_patch.sd3_pipeline_with_logprob_fast import pipeline_with_logprob
+from flow_grpo.diffusers_patch.sd3_pipeline_with_logprob_fast import pipeline_with_logprob_random as pipeline_with_logprob
 from flow_grpo.diffusers_patch.sd3_sde_with_logprob import sde_step_with_logprob_new as sde_step_with_logprob
 from flow_grpo.diffusers_patch.train_dreambooth_lora_sd3 import encode_prompt
 import torch
@@ -30,27 +30,40 @@ from peft import LoraConfig, get_peft_model, set_peft_model_state_dict, PeftMode
 import random
 from torch.utils.data import Dataset, DataLoader, Sampler
 from flow_grpo.ema import EMAModuleWrapper
+from flow_grpo.stylegan_discriminator import StyleGANImageDiscriminator
+from flow_grpo.patchgan_discriminator import PatchGANImageDiscriminator
+
+from torchvision import transforms
+import torch.nn as nn
+from torch.nn.parallel import DistributedDataParallel as DDP
+from flow_grpo.grpo_discriminator import GRPOWithDiscriminator
+from flow_grpo.pickscore_scorer import PickScoreScorer
+from flow_grpo.pick_score_training import CLIPCriterionConfig, CLIPCriterion
+import timm
 
 tqdm = partial(tqdm.tqdm, dynamic_ncols=True)
 
-
+torch.autograd.set_detect_anomaly(True)
 FLAGS = flags.FLAGS
 config_flags.DEFINE_config_file("config", "config/base.py", "Training configuration.")
 
 logger = get_logger(__name__)
 
+criterion = CLIPCriterion(CLIPCriterionConfig())
+
 class TextPromptDataset(Dataset):
-    def __init__(self, dataset, split='train'):
+    def __init__(self, dataset, split='train', limit=None):
         self.file_path = os.path.join(dataset, f'{split}.txt')
         with open(self.file_path, 'r') as f:
-            self.prompts = [line.strip() for line in f.readlines()]
+            if limit is None:
+                self.prompts = [line.strip() for line in f.readlines()]
+            else:
+                self.prompts = [line.strip() for line in f.readlines()][:limit]
         
     def __len__(self):
         return len(self.prompts)
     
     def __getitem__(self, idx):
-        # print("index:", idx)
-        # print("prompt:",self.prompts[idx])
         return {"prompt": self.prompts[idx], "metadata": {}}
 
     @staticmethod
@@ -118,12 +131,108 @@ class DistributedKRepeatSampler(Sampler):
                 per_card_samples.append(shuffled_samples[start:end])
             
             # Return current replica's sample indices
-            # print("Sampler epoch:", self.epoch)
-            # print(per_card_samples[self.rank])
             yield per_card_samples[self.rank]
     
     def set_epoch(self, epoch):
         self.epoch = epoch  # Used to synchronize random state across epochs
+
+
+
+def tensor_to_pil_list(tensor_imgs):
+    """
+    tensor_imgs: torch.Tensor [B,3,H,W], range [-1,1]
+    return: list of PIL Images
+    """
+    imgs = []
+    for img in tensor_imgs:
+        # [-1,1] -> [0,1]
+        img = (img * 0.5 + 0.5).clamp(0, 1)
+        # [C,H,W] -> [H,W,C]
+        img = img.permute(1, 2, 0).detach().cpu().numpy()
+        # [0,1] -> [0,255] uint8
+        img = (img * 255).astype(np.uint8)
+        # to PIL
+        imgs.append(Image.fromarray(img))
+    return imgs
+
+
+def train_dino(scorer, head, prompts, external_imgs_pil, generated_imgs_pil, optimizer_D, accelerator, n_patches=64, patch_loss_weight=0.3):
+    """
+    单次训练 step，加入 CLS + 随机采样 patch loss
+    """
+    import torch
+    import torch.nn.functional as F
+    from torchvision import transforms
+
+    device = accelerator.device
+
+    # --- 预处理 ---
+    transform = transforms.Compose([
+        transforms.Resize((512, 512), interpolation=transforms.InterpolationMode.BICUBIC),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225])
+    ])
+
+    # 转换 PIL -> tensor
+    pos_imgs = torch.stack([transform(img) for img in external_imgs_pil]).to(device).to(torch.bfloat16)
+    neg_imgs = torch.stack([transform(img) for img in generated_imgs_pil]).to(device).to(torch.bfloat16)
+
+    # --- forward ---
+    scorer.eval()  # backbone 固定
+    head.train()   # 训练 head
+
+    with torch.no_grad():
+        out_real = scorer.forward_features(pos_imgs)   # [B, N+1, D]
+        out_fake = scorer.forward_features(neg_imgs)   # [B, N+1, D]
+
+        cls_real, patch_real = out_real[:,0], out_real[:,1:]   # [B,D], [B,N,D]
+        cls_fake, patch_fake = out_fake[:,0], out_fake[:,1:]   # [B,D], [B,N,D]
+
+    # --- CLS image-wise logits ---
+    logits_real_cls = head(cls_real).squeeze(-1)   # [B]
+    logits_fake_cls = head(cls_fake).squeeze(-1)   # [B]
+
+    # Hinge loss (CLS-level)
+    loss_real_cls = torch.mean(F.relu(1.0 - logits_real_cls))
+    loss_fake_cls = torch.mean(F.relu(1.0 + logits_fake_cls))
+    image_loss = 0.5 * (loss_real_cls + loss_fake_cls)
+
+    # --- Patch-level logits (随机采样 n_patches) ---
+    B, N, D = patch_real.shape
+    n_select = min(n_patches, N)
+
+    # 随机 index（每张图采样不同的 patch）
+    idx_real = torch.randint(0, N, (B, n_select), device=device)
+    idx_fake = torch.randint(0, N, (B, n_select), device=device)
+
+    sampled_real = torch.gather(patch_real, 1, idx_real.unsqueeze(-1).expand(-1, -1, D))  # [B,n,D]
+    sampled_fake = torch.gather(patch_fake, 1, idx_fake.unsqueeze(-1).expand(-1, -1, D))  # [B,n,D]
+
+    logits_real_patch = head(sampled_real).squeeze(-1)  # [B,n]
+    logits_fake_patch = head(sampled_fake).squeeze(-1)  # [B,n]
+
+    # Patch-level hinge loss
+    loss_real_patch = torch.mean(F.relu(1.0 - logits_real_patch))
+    loss_fake_patch = torch.mean(F.relu(1.0 + logits_fake_patch))
+    patch_loss = 0.5 * (loss_real_patch + loss_fake_patch)
+
+    # --- Total loss ---
+    d_loss = image_loss + patch_loss_weight * patch_loss
+    # d_loss = patch_loss
+    # import pdb; pdb.set_trace()
+
+    # --- backward ---
+    optimizer_D.zero_grad()
+    d_loss.backward()
+    optimizer_D.step()
+
+    # --- accuracy (用CLS判断) ---
+    preds_real = (logits_real_cls > 0).float()
+    preds_fake = (logits_fake_cls < 0).float()
+    acc = 0.5 * (preds_real.mean().item() + preds_fake.mean().item())
+
+    return d_loss.item(), acc
 
 
 def compute_text_embeddings(prompt, text_encoders, tokenizers, max_sequence_length, device):
@@ -142,7 +251,7 @@ def calculate_zero_std_ratio(prompts, gathered_rewards):
     Args:
         prompts: List of prompts.
         gathered_rewards: Dictionary containing rewards, must include the key 'ori_avg'.
-        
+    
     Returns:
         zero_std_ratio: Proportion of prompts with zero standard deviation.
         prompt_std_devs: Mean standard deviation across all unique prompts.
@@ -206,11 +315,10 @@ def compute_log_prob(transformer, pipeline, sample, j, embeds, pooled_embeds, co
         prev_sample=sample["next_latents"][:, j].float(),
         noise_level=config.sample.noise_level,
     )
-    # import pdb; pdb.set_trace()
 
     return prev_sample, log_prob, prev_sample_mean, std_dev_t
 
-def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters):
+def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters,scorer):
     if config.train.ema:
         ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
     neg_prompt_embed, neg_pooled_prompt_embed = compute_text_embeddings([""], text_encoders, tokenizers, max_sequence_length=128, device=accelerator.device)
@@ -220,6 +328,9 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
 
     # test_dataloader = itertools.islice(test_dataloader, 2)
     all_rewards = defaultdict(list)
+    file_path = os.path.join(config.test_external_image_path,"prompt2img_node0.json")
+    with open(file_path, "r", encoding="utf-8") as f:
+        external_images_dic = json.load(f)
     for test_batch in tqdm(
             test_dataloader,
             desc="Eval: ",
@@ -227,6 +338,8 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
             position=0,
         ):
         prompts, prompt_metadata = test_batch
+        # import pdb; pdb.set_trace()
+        # prompts = ["an image of a cat on head of trump "]
         prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
             prompts, 
             text_encoders, 
@@ -234,10 +347,15 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
             max_sequence_length=128, 
             device=accelerator.device
         )
+        # import pdb; pdb.set_trace()
+        
         # The last batch may not be full batch_size
         if len(prompt_embeds)<len(sample_neg_prompt_embeds):
             sample_neg_prompt_embeds = sample_neg_prompt_embeds[:len(prompt_embeds)]
             sample_neg_pooled_prompt_embeds = sample_neg_pooled_prompt_embeds[:len(prompt_embeds)]
+        # import pdb; pdb.set_trace()
+        generator = torch.Generator()
+        generator.manual_seed(0)
         
         with autocast():
             with torch.no_grad():
@@ -256,17 +374,46 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
                     mini_num_image_per_prompt=1,
                     process_index=accelerator.process_index,
                     sample_num_steps=config.sample.num_steps,
+                    random_timestep = config.sample.random_timestep,
+                    generator = generator,
                 )
-        rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=False)
+        # rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=False)
+        external_images = []
+        for prompt in prompts:
+            if prompt in external_images_dic:
+                file_path =  os.path.join(config.test_external_image_path,external_images_dic[prompt][0])
+                # file_path =  os.path.join(config.test_external_image_path,external_images_dic[prompt])
+            else:
+                file_path = "/mnt/bn/vgfm2/test_dit/weijia/flow_grpo/img0.png"
+                # print("flux does exist the images")
+            external_image = Image.open(file_path)
+            external_images.append(external_image)
+        # import pdb; pdb.set_trace()
+        preprocess = transforms.Compose([
+            transforms.Resize((512, 512)),
+            transforms.ToTensor(),  # 转 [0,1]
+            # transforms.Normalize([0.5], [0.5])  # 映射到 [-1,1]
+        ])
+
+        img_tensors = [preprocess(img) for img in external_images]  # list of [3,512,512]
+        img_tensor = torch.stack(img_tensors, dim=0).to(accelerator.device, dtype=torch.float32)  # [B,3,512,512]
+        # import pdb; pdb.set_trace()
+        rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, scorer = scorer, only_strict=True,  ref_images = img_tensor)
+        # rewards = executor.submit(reward_fn, images.to(torch.bfloat16), prompts, prompt_metadata, scorer = scorer, only_strict=True, ref_images = img_tensor.to(torch.bfloat16))
+        # rewards = reward_fn(images.to(torch.bfloat16), prompts, prompt_metadata, scorer = scorer, only_strict=True, ref_images = img_tensor.to(torch.bfloat16))
+        # rewards = reward_fn(images, prompts, prompt_metadata, scorer = scorer, only_strict=True, ref_images = img_tensor)
         # yield to to make sure reward computation starts
         time.sleep(0)
         rewards, reward_metadata = rewards.result()
 
         for key, value in rewards.items():
-            rewards_gather = accelerator.gather(torch.as_tensor(value, device=accelerator.device)).cpu().numpy()
+            # rewards_gather = accelerator.gather(torch.as_tensor(value, device=accelerator.device)).cpu().numpy()
+            rewards_gather = accelerator.gather(torch.as_tensor(value, device=accelerator.device, dtype=torch.float32)).cpu().numpy()
             all_rewards[key].append(rewards_gather)
     
-    last_batch_images_gather = accelerator.gather(torch.as_tensor(images, device=accelerator.device)).cpu().numpy()
+    # import pdb; pdb.set_trace()
+    
+    last_batch_images_gather = accelerator.gather(torch.as_tensor(images, device=accelerator.device, dtype=torch.float32)).cpu().numpy()
     last_batch_prompt_ids = tokenizers[0](
         prompts,
         padding="max_length",
@@ -280,7 +427,7 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
     )
     last_batch_rewards_gather = {}
     for key, value in rewards.items():
-        last_batch_rewards_gather[key] = accelerator.gather(torch.as_tensor(value, device=accelerator.device)).cpu().numpy()
+        last_batch_rewards_gather[key] = accelerator.gather(torch.as_tensor(value, device=accelerator.device, dtype=torch.float32)).cpu().numpy()
 
     all_rewards = {key: np.concatenate(value) for key, value in all_rewards.items()}
     if accelerator.is_main_process:
@@ -360,10 +507,13 @@ def main(_):
         gradient_accumulation_steps=config.train.gradient_accumulation_steps * config.sample.train_num_steps,
     )
     if accelerator.is_main_process:
-        wandb.init(
-            project="flow_grpo",
-            name=f"case_{config.case_name}", 
-        )
+        if config.wandb_init:
+            wandb.init(
+                project="flow_grpo",
+                name=f"case_{config.case_name}", 
+            )
+        else:
+            pass
         # accelerator.init_trackers(
         #     project_name="flow-grpo",
         #     config=config.to_dict(),
@@ -440,21 +590,68 @@ def main(_):
             pipeline.transformer.set_adapter("default")
         else:
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
+
+
+    if config.discriminator == "stylegan":
+        scorer = StyleGANImageDiscriminator(
+            base_channel=64,
+            image_size=(512, 512),
+            channel_multipliers=(2, 4, 8, 8, 8, 8),
+            blur_resample="blur",
+            use_gradfix=False
+        ).to(accelerator.device)
+    elif config.discriminator == "patchgan":
+        scorer = PatchGANImageDiscriminator(
+            input_nc=3,         # 输入通道数，通常是RGB
+            ndf=64,             # 基础通道数
+            n_layers=3,         # PatchGAN默认3~4层即可
+            kw=4,               # 卷积核大小
+            padw=1,             # padding
+            use_bias=False,
+            norm_type="BatchNorm",
+        ).to(accelerator.device)
+    else:
+        # scorer = PickScoreScorer(dtype=torch.bfloat16, device=accelerator.device)
+        # scorer = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True)
+        scorer = timm.create_model('vit_large_patch16_dinov3_qkvb.lvd1689m', pretrained=True)
+
+        scorer.eval().to(accelerator.device)
+
+        class DINOHead(nn.Module):
+            def __init__(self, in_dim=1024, hidden_dim=512):
+                super().__init__()
+                self.layers = nn.Sequential(
+                    nn.Linear(in_dim, hidden_dim),
+                    nn.GELU(),
+                    nn.Linear(hidden_dim, 1)  # 输出一个分数
+                )
+
+            def forward(self, x):
+                return self.layers(x)
+        head = DINOHead(in_dim=scorer.num_features).to(accelerator.device)
+
+
+
+    head.requires_grad = True
+
+    # weight_path = "/mnt/bn/vgfm2/test_dit/weijia/flow_grpo/stylegan_discriminator.pth"
+    weight_path = config.weight_path
+    # weight_path = None
+    if weight_path is not None:
+        state_dict = torch.load(weight_path, map_location="cpu")
+        scorer.load_state_dict(state_dict)
+        print(f"Loaded discriminator weights from {weight_path}")
     
     transformer = pipeline.transformer
     transformer_trainable_parameters = list(filter(lambda p: p.requires_grad, transformer.parameters()))
     # This ema setting affects the previous 20 × 8 = 160 steps on average.
     ema = EMAModuleWrapper(transformer_trainable_parameters, decay=0.9, update_step_interval=8, device=accelerator.device)
-    # def count_parameters(model):
-    #     total_params = sum(p.numel() for p in model.parameters())
-    #     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    #     return total_params, trainable_params
 
-    # total_params, trainable_params = count_parameters(transformer)
 
-    # print(f"模型总参数量: {total_params/1e9:.2f} B ({total_params:,} 个参数)")
-    # print(f"可训练参数量: {trainable_params/1e9:.2f} B ({trainable_params:,} 个参数)")
-        
+    # scorer_trainable_parameters = list(filter(lambda p: p.requires_grad, scorer.parameters()))
+
+
+
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if config.allow_tf32:
@@ -472,22 +669,25 @@ def main(_):
         optimizer_cls = bnb.optim.AdamW8bit
     else:
         optimizer_cls = torch.optim.AdamW
+    
 
     optimizer = optimizer_cls(
         transformer_trainable_parameters,
+        # all_trainable_parameters,
         lr=config.train.learning_rate,
         betas=(config.train.adam_beta1, config.train.adam_beta2),
         weight_decay=config.train.adam_weight_decay,
         eps=config.train.adam_epsilon,
     )
 
+
     # prepare prompt and reward fn
     reward_fn = getattr(flow_grpo.rewards, 'multi_score')(accelerator.device, config.reward_fn)
-    eval_reward_fn = getattr(flow_grpo.rewards, 'multi_score')(accelerator.device, config.reward_fn)
+    eval_reward_fn = getattr(flow_grpo.rewards, 'multi_score')(accelerator.device, config.eval_reward_fn)
     # import pdb; pdb.set_trace()
 
     if config.prompt_fn == "general_ocr":
-        train_dataset = TextPromptDataset(config.dataset, 'train')
+        train_dataset = TextPromptDataset(config.dataset, 'train', limit=config.limit)
         test_dataset = TextPromptDataset(config.dataset, 'test')
 
         # Create an infinite-loop DataLoader
@@ -506,8 +706,6 @@ def main(_):
             batch_sampler=train_sampler,
             num_workers=1,
             collate_fn=TextPromptDataset.collate_fn,
-            # prefetch_factor=1, 
-            # persistent_workers=False
             # persistent_workers=True
         )
 
@@ -572,9 +770,20 @@ def main(_):
 
     if accelerator.state.deepspeed_plugin:
          accelerator.state.deepspeed_plugin.deepspeed_config['train_micro_batch_size_per_gpu'] = config.sample.train_batch_size
+    
+
+    head = head.to(torch.bfloat16)
+    scorer = scorer.to(torch.bfloat16)
+    scorer.requires_grad = False
+    local_rank = accelerator.local_process_index
+    head = DDP(head, device_ids=[local_rank], output_device=local_rank)
+    optimizer_D = torch.optim.Adam(head.parameters(), lr=config.d_lr, betas=(0.5, 0.999))
+    # model = GRPOWithDiscriminator(transformer, scorer)
 
     # Prepare everything with our `accelerator`.
-    transformer, optimizer, train_dataloader, test_dataloader = accelerator.prepare(transformer, optimizer, train_dataloader, test_dataloader)
+    # model, optimizer, optimizer_D, train_dataloader, test_dataloader = accelerator.prepare(model, optimizer, optimizer_D, train_dataloader, test_dataloader)
+    transformer, optimizer,  train_dataloader, test_dataloader = accelerator.prepare(
+        transformer, optimizer, train_dataloader, test_dataloader)
 
     # executor to perform callbacks asynchronously. this is beneficial for the llava callbacks which makes a request to a
     # remote server running llava inference.
@@ -615,19 +824,27 @@ def main(_):
     global_step = 0
     train_iter = iter(train_dataloader)
 
+    # file_path = os.path.join(config.external_image_path,"prompt2img.json")
+    # file_path = "/mnt/bn/vgfm2/test_dit/weijia/flow_grpo/prompt2img_merged.json"
+    file_path = config.json_path
+    with open(file_path, "r", encoding="utf-8") as f:
+        external_images_dic = json.load(f)
+    
     while True:
         # #################### EVAL ####################
-        pipeline.transformer.eval()
-        if epoch % config.eval_freq == 0:
-            eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters)
-        if epoch % config.save_freq == 0 and epoch > 0 and accelerator.is_main_process:
-            save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
+        if config.wandb_init:
+            pipeline.transformer.eval()
+            if (epoch) % config.eval_freq == 0:
+                eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters, scorer)
+            if (epoch) % config.save_freq == 0 and epoch > 0 and accelerator.is_main_process:
+                save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
 
         #################### SAMPLING ####################
         pipeline.transformer.eval()
         samples = []
         prompts = []
-        # import pdb; pdb.set_trace()
+        generated_imgs = []
+        external_imgs = []
         for i in tqdm(
             range(config.sample.num_batches_per_epoch),
             desc=f"Epoch {epoch}: sampling",
@@ -636,9 +853,6 @@ def main(_):
         ):
             train_sampler.set_epoch(epoch * config.sample.num_batches_per_epoch + i)
             prompts, prompt_metadata = next(train_iter)
-            # print(prompts)
-            # import pdb; pdb.set_trace()
-            # prompts = ["photo of a girl, wearing respirator, long straight blonde hair in a ponytail"]
 
             prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
                 prompts, 
@@ -679,7 +893,45 @@ def main(_):
                         train_num_steps=config.sample.train_num_steps,
                         process_index=accelerator.process_index,
                         sample_num_steps=config.sample.num_steps,
+                        random_timestep = config.sample.random_timestep,
                     )
+                    if prompts[0] in external_images_dic:
+                        # import pdb; pdb.set_trace()
+                        # file_list = []
+                        # for i in range(8):
+                        #     random_prompt = random.choice(list(external_images_dic.keys()))
+                        #     file_list.append(external_images_dic[random_prompt][0])
+                        # file_list = external_images_dic[prompts[0]][:1]*8  # 这是一个list
+                        file_list = external_images_dic[prompts[0]]  # 这是一个list
+                        external_images = []
+                        for fname in file_list:
+                            fpath = os.path.join(config.external_image_path, fname)
+                            try:
+                                img = Image.open(fpath).convert("RGB")
+                                external_images.append(img)
+                            except Exception as e:
+                                print(f"[Error] Failed to open {fpath}: {e}")
+                                default_path = "/mnt/bn/vgfm2/test_dit/weijia/flow_grpo/img.png"
+                                img = Image.open(default_path).convert("RGB")
+                                external_images.append(img)
+                    else:
+                        # 用默认图片兜底
+                        print(f"[Warning] external image not found for prompt: {prompts[0]}")
+                        default_path = "/mnt/bn/vgfm2/test_dit/weijia/outputs/qwen_images_ocr_8/node0_rank0_00001_0.png"
+                        external_images = [Image.open(default_path).convert("RGB")]*8
+                    
+                    preprocess = transforms.Compose([
+                        transforms.Resize((512, 512)),
+                        transforms.ToTensor(),  # 转 [0,1]
+                        # transforms.Normalize([0.5], [0.5])  # 映射到 [-1,1]
+                    ])
+                    # 批量处理
+                    img_tensors = [preprocess(img) for img in external_images]  # list of [3,512,512]
+                    img_tensor = torch.stack(img_tensors, dim=0).to(accelerator.device, dtype=torch.float32)  # [B,3,512,512]
+                    generated_imgs.append(images)
+                    external_imgs.append(img_tensor)
+                    # import pdb; pdb.set_trace()
+
                     
                     # end = time.time()
                     # print("运行时间: {:.2f} 秒".format(end - start))
@@ -699,7 +951,12 @@ def main(_):
             prompts = pipeline.tokenizer.batch_decode(
                 prompt_ids.repeat(config.sample.mini_num_image_per_prompt,1), skip_special_tokens=True
             )
-            rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=True)
+
+            rewards = executor.submit(reward_fn, images.to(torch.bfloat16), prompts, prompt_metadata, scorer = scorer, head = head,  only_strict=True)
+            external_rewards = executor.submit(reward_fn, img_tensor.to(torch.bfloat16), prompts, prompt_metadata, scorer = scorer,  head = head,  only_strict=True)
+            # import pdb; pdb.set_trace()
+            # rewards = reward_fn(images.to(torch.bfloat16), prompts, prompt_metadata, scorer = scorer,head = head,  only_strict=True)
+            # import pdb; pdb.set_trace()
             # yield to to make sure reward computation starts
             time.sleep(0)
             samples.append(
@@ -716,9 +973,10 @@ def main(_):
                     ],  # each entry is the latent after timestep t
                     "log_probs": log_probs,
                     "rewards": rewards,
+                    "external_rewards": external_rewards,
                 }
             )
-        # import pdb; pdb.set_trace()
+
 
         # wait for all rewards to be computed
         for sample in tqdm(
@@ -728,10 +986,16 @@ def main(_):
             position=0,
         ):
             rewards, reward_metadata = sample["rewards"].result()
+            external_rewards, external_reward_metadata = sample["external_rewards"].result()
             # accelerator.print(reward_metadata)
+            # import pdb; pdb.set_trace()
             sample["rewards"] = {
                 key: torch.as_tensor(value, device=accelerator.device).float()
                 for key, value in rewards.items()
+            }
+            sample["external_rewards"] = {
+                key: torch.as_tensor(value, device=accelerator.device).float()
+                for key, value in external_rewards.items()
             }
 
         # collate samples into dict where each entry has shape (num_batches_per_epoch * sample.batch_size, ...)
@@ -744,7 +1008,6 @@ def main(_):
             }
             for k in samples[0].keys()
         }
-        # import pdb; pdb.set_trace()
 
         if epoch % 10 == 0 and accelerator.is_main_process:
             # this is a hack to force wandb to log the images as JPEGs instead of PNGs
@@ -759,32 +1022,66 @@ def main(_):
                     )
                     pil = pil.resize((config.resolution, config.resolution))
                     pil.save(os.path.join(tmpdir, f"{idx}.jpg"))  # 使用新的索引
-                    pil.save( f"{idx}.jpg")
-                    # import pdb; pdb.set_trace()
+                    # pil.save( f"{idx}.jpg")
+                # import pdb; pdb.set_trace()
+                # print("prompts",len(prompts))
 
                 sampled_prompts = [prompts[i] for i in sample_indices]
                 sampled_rewards = [rewards['avg'][i] for i in sample_indices]
+                if config.wandb_init:
+                    wandb.log(
+                        {
+                            "images": [
+                                wandb.Image(
+                                    os.path.join(tmpdir, f"{idx}.jpg"),
+                                    caption=f"{prompt:.100} | avg: {avg_reward:.2f}",
+                                )
+                                for idx, (prompt, avg_reward) in enumerate(zip(sampled_prompts, sampled_rewards))
+                            ],
+                        },
+                        step=global_step,
+                    )
+            # import pdb; pdb.set_trace()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                num_samples = min(15, len(img_tensor))
+                sample_indices = random.sample(range(len(img_tensor)), num_samples)
 
-                wandb.log(
-                    {
-                        "images": [
-                            wandb.Image(
-                                os.path.join(tmpdir, f"{idx}.jpg"),
-                                caption=f"{prompt:.100} | avg: {avg_reward:.2f}",
-                            )
-                            for idx, (prompt, avg_reward) in enumerate(zip(sampled_prompts, sampled_rewards))
-                        ],
-                    },
-                    step=global_step,
-                )
+                for idx, i in enumerate(sample_indices):
+                    image = img_tensor[i]
+                    pil = Image.fromarray(
+                        (image.cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
+                    )
+                    pil = pil.resize((config.resolution, config.resolution))
+                    pil.save(os.path.join(tmpdir, f"{idx}.jpg"))  # 使用新的索引
+                if config.wandb_init:
+                    wandb.log(
+                        {
+                            "external_images": [
+                                wandb.Image(
+                                    os.path.join(tmpdir, f"{idx}.jpg"),
+                                )
+                                for  idx, i in enumerate(sample_indices)
+                            ],
+                        },
+                        step=global_step,
+                    )
+
         samples["rewards"]["ori_avg"] = samples["rewards"]["avg"]
         # The purpose of repeating `adv` along the timestep dimension here is to make it easier to introduce timestep-dependent advantages later, such as adding a KL reward.
         samples["rewards"]["avg"] = samples["rewards"]["avg"].unsqueeze(1).repeat(1, config.sample.train_num_steps)
         # gather rewards across processes
         gathered_rewards = {key: accelerator.gather(value) for key, value in samples["rewards"].items()}
         gathered_rewards = {key: value.cpu().numpy() for key, value in gathered_rewards.items()}
+
+        samples["external_rewards"]["ori_avg"] = samples["external_rewards"]["avg"]
+        # The purpose of repeating `adv` along the timestep dimension here is to make it easier to introduce timestep-dependent advantages later, such as adding a KL reward.
+        samples["external_rewards"]["avg"] = samples["external_rewards"]["avg"].unsqueeze(1).repeat(1, config.sample.train_num_steps)
+        # gather rewards across processes
+        gathered_external_rewards = {key: accelerator.gather(value) for key, value in samples["external_rewards"].items()}
+        gathered_external_rewards = {key: value.cpu().numpy() for key, value in gathered_external_rewards.items()}
+
         # log rewards and images
-        if accelerator.is_main_process:
+        if accelerator.is_main_process and config.wandb_init:
             wandb.log(
                 {
                     "epoch": epoch,
@@ -792,11 +1089,21 @@ def main(_):
                 },
                 step=global_step,
             )
-        
-        # import pdb; pdb.set_trace()
+            wandb.log(
+                {
+                    "epoch": epoch,
+                    **{f"external_reward_{key}": value.mean() for key, value in gathered_external_rewards.items() if '_strict_accuracy' not in key and '_accuracy' not in key},
+                },
+                step=global_step,
+            )
+
         # per-prompt mean/std tracking
         if config.per_prompt_stat_tracking:
             # gather the prompts across processes
+            prompt_ids_per_gpu = samples["prompt_ids"].cpu().numpy()
+            prompts_per_gpu = pipeline.tokenizer.batch_decode(
+                prompt_ids_per_gpu, skip_special_tokens=True
+            )
             prompt_ids = accelerator.gather(samples["prompt_ids"]).cpu().numpy()
             prompts = pipeline.tokenizer.batch_decode(
                 prompt_ids, skip_special_tokens=True
@@ -810,7 +1117,7 @@ def main(_):
 
             zero_std_ratio, reward_std_mean = calculate_zero_std_ratio(prompts, gathered_rewards)
 
-            if accelerator.is_main_process:
+            if accelerator.is_main_process and config.wandb_init:
                 wandb.log(
                     {
                         "group_size": group_size,
@@ -833,8 +1140,64 @@ def main(_):
         )
         if accelerator.is_local_main_process:
             print("advantages: ", samples["advantages"].abs().mean())
+        
+        external_imgs = torch.cat(external_imgs, dim=0)  # [N, 3, 512, 512]
+        generated_imgs = torch.cat(generated_imgs, dim=0)  # [N, 3, 512, 512]
+
+        external_imgs = (external_imgs - 0.5) * 2.0
+        generated_imgs = (generated_imgs - 0.5) * 2.0
+        rewards_mean = accelerator.gather(samples["rewards"]['dinov3_patch_cotrain']).mean()
+        external_rewards_mean = accelerator.gather(samples["external_rewards"]['dinov3_patch_cotrain']).mean()
+
+        # rewards
+        head.requires_grad = True
+        transformer.requires_grad = False
+        # if config.train_d:
+        if config.train_d and (epoch+1)%config.d_times!=0:
+        # if config.train_d and external_rewards_mean < rewards_mean:
+            # import pdb; pdb.set_trace()
+            external_imgs_pil = tensor_to_pil_list(external_imgs)
+            generated_imgs_pil = tensor_to_pil_list(generated_imgs)
+            # import pdb; pdb.set_trace()
+            len_ext = len(external_imgs_pil)
+            len_gen = len(generated_imgs_pil)
+
+            if len_ext != len_gen:
+                min_len = min(len_ext, len_gen)
+                print(f"[Warning] external_imgs_pil({len_ext}) and generated_imgs_pil({len_gen}) length mismatch, truncating to {min_len}")
+                external_imgs_pil = external_imgs_pil[:min_len]
+                generated_imgs_pil = generated_imgs_pil[:min_len]
+                
+            d_loss ,acc = train_dino(scorer, head, prompts_per_gpu, external_imgs_pil, generated_imgs_pil, optimizer_D, accelerator)
+
+            # import pdb; pdb.set_trace()
+            if accelerator.is_main_process and config.wandb_init:
+                wandb.log({"train/d_loss": d_loss}, step=global_step)
+                wandb.log({"train/acc": acc}, step=global_step)
+            global_step+=1
+            epoch+=1
+            continue
+
+        # if config.train_d and external_rewards_mean < rewards_mean:
+        #     ext_scores = samples["external_rewards"]['pickscore_cotrain']# [B]
+        #     gen_scores = samples["rewards"]['pickscore_cotrain']# [B]
+        #     mask = gen_scores > ext_scores  # [B] bool 张量
+        #     external_imgs_pil = tensor_to_pil_list(external_imgs)
+        #     generated_imgs_pil = tensor_to_pil_list(generated_imgs)
+        #     filtered_ext_imgs = []
+        #     filtered_gen_imgs = []
+        #     filtered_prompts = []
+        #  
+        # import pdb; pdb.set_trace()
+
+
+
+
+        head.requires_grad = False
+        transformer.requires_grad = True
 
         del samples["rewards"]
+        del samples["external_rewards"]
         del samples["prompt_ids"]
 
         total_batch_size, num_timesteps = samples["timesteps"].shape
@@ -842,7 +1205,14 @@ def main(_):
         #     total_batch_size
         #     == config.sample.train_batch_size * config.sample.num_batches_per_epoch
         # )
+
+
+
+
+
         #################### TRAINING ####################
+        
+
         for inner_epoch in range(config.train.num_inner_epochs):
             # rebatch for training
             samples_batched = {
@@ -906,7 +1276,8 @@ def main(_):
                         )
                         policy_loss = torch.mean(torch.maximum(unclipped_loss, clipped_loss))
                         if config.train.beta > 0:
-                            kl_loss = ((prev_sample_mean - prev_sample_mean_ref) ** 2).mean(dim=(1,2,3), keepdim=True) / (2 * std_dev_t ** 2)
+                            # kl_loss = ((prev_sample_mean - prev_sample_mean_ref) ** 2).mean(dim=(1,2,3), keepdim=True) / (2 * std_dev_t ** 2)
+                            kl_loss = ((prev_sample_mean - prev_sample_mean_ref) ** 2).mean(dim=(1,2,3), keepdim=True) 
                             kl_loss = torch.mean(kl_loss)
                             loss = policy_loss + config.train.beta * kl_loss
                         else:
@@ -938,6 +1309,7 @@ def main(_):
                             )
                         )
                         info["policy_loss"].append(policy_loss)
+                        # info["discriminator_loss"].append(d_loss)
                         if config.train.beta > 0:
                             info["kl_loss"].append(kl_loss)
 
