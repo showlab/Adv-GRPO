@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en" class="h-100" data-bs-theme="auto">
+  <head>
+    <script src="./assets/js/color-modes.js"></script>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="The Image as Its Own Reward: Reinforcement Learning with Adversarial Reward for Image Generation">
+    <title>Adv-GRPO</title>
+
+    <link rel="icon" href="./assets/images/showlab.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@3">
+    <link href="./assets/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+      .text-highlight { color: #e06766; }
+      .title a { text-decoration: none; }
+    </style>
+
+    <link href="./assets/cover.css" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+  </head>
+
+  <body class="text-center text-bg-dark">
+
+  <main>
+
+    <!-- 顶部 Hero 区域 -->
+    <!-- <section class="text-center container min-vh-100"> -->
+    <section class="text-center container">
+      <div class="row py-5">
+        <div class="mx-auto" style="margin-top: 16%; opacity: 0.90;">
+          <h1 class="display-2 fw-bold title">
+            <span class="display-4">The Image as Its Own Reward: Reinforcement Learning with Adversarial Reward for Image Generation</span>
+          </h1>
+
+           <p class="author-list">
+            <a href='https://scholar.google.com/citations?user=S7bGBmkyNtEC&hl=zh-CN' target='_blank'>Weijia Mao</a>&emsp;
+            <a href='https://haochen-rye.github.io/' target='_blank'>Hao Chen</a>&emsp;
+            <a href='https://zhenheny.github.io/' target='_blank'>Zhenheng Yang</a>
+            <a href='https://sites.google.com/view/showlab/home?authuser=0' target='_blank'>Mike Zheng Shou</a>&emsp;
+        
+          </p>
+
+          <p class="institution-list">
+            <a href='https://sites.google.com/view/showlab/home?authuser=0' target='_blank'>
+                Show Lab, National University of Singapore, 
+            </a>
+            <a href='https://www.bytedance.com/' target='_blank'>
+                ByteDance
+            </a>
+            <br>
+            <small><sup>&#x2709</sup> Corresponding Author</small>
+        </p>
+
+          <p>
+            <a href="https://github.com/showlab/Adv-GRPO" class="btn btn-outline-light">Code</a>
+            <a href="https://arxiv.org/abs/2309.15818" class="btn btn-outline-light">arXiv</a>
+            <a href="https://showlab.github.io/Show-1/assets/Show-1.pdf" class="btn btn-outline-light">PDF</a>
+          </p>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Abstract -->
+    <div class="album py-5 col-lg-5 mx-auto bg-dark">
+      <div class="container">
+        <h1>Abstract</h1>
+        <br>
+
+        <p style="text-align: justify;">
+          A reliable reward function is essential for reinforcement learning (RL) in image generation. 
+          Most current RL approaches depend on pre-trained preference models that output scalar rewards 
+          to approximate human preferences. However, these rewards often fail to capture human perception 
+          and are vulnerable to reward hacking, where higher scores do not correspond to better images. 
+          To address this, we introduce Adv-GRPO, an RL framework with an adversarial reward that iteratively 
+          updates both the reward model and the generator. The reward model is supervised using reference 
+          images as positive samples and can largely avoid being hacked. Unlike KL regularization that 
+          constrains parameter updates, our learned reward directly guides the generator through its visual 
+          outputs, leading to higher-quality images. Moreover, while optimizing existing reward functions 
+          can alleviate reward hacking, their inherent biases remain. For instance, PickScore may degrade 
+          image quality, whereas OCR-based rewards often reduce aesthetic fidelity. To address this, we 
+          take the image itself as a reward, using reference images and vision foundation models (e.g., DINO) 
+          to provide rich visual rewards. These dense visual signals, instead of a single scalar, lead to 
+          consistent gains across image quality, aesthetics, and task-specific metrics. Finally, we show that 
+          combining reference samples with foundation-model rewards enables distribution transfer and flexible 
+          style customization. In human evaluation, our method outperforms Flow-GRPO and SD3, achieving 
+          70.0% and 72.4% win rates in image quality and aesthetics, respectively. Code and models will be released at 
+          <a href="https://github.com/showlab/Adv-GRPO" target="_blank">https://github.com/showlab/Adv-GRPO</a>.
+      </p>
+      
+      </div>
+    </div>
+
+    <!-- Method -->
+    <div class="album py-5 bg-body-tertiary text-dark">
+      <div class="container col-lg-8 mx-auto">
+
+<!-- 
+        <p style="text-align: justify;">
+          <strong>Pixel-based VDMs</strong> can generate motion accurately aligned with text but require huge computation.
+          <strong>Latent-based VDMs</strong> are efficient but often lose semantic detail.
+        </p> -->
+
+        <img src="./assets/images/teaser.png" style="width: 100%;">
+
+        <p style="text-align: justify;">
+          Overview of our approach. Our method <strong>Adv-GRPO</strong> improves text-to-image (T2I) generation in three ways: 
+          1) <strong>Alleviate Reward Hacking</strong>, achieving higher perceptual quality while maintaining comparable benchmark 
+          performance (e.g., PickScore, OCR), as shown in the top-left human evaluation panel; 
+          2) <strong>Visual Foundation Model as Reward</strong>, leveraging visual foundation models (e.g., DINO) for rich visual 
+          priors, leading to overall improvements as shown in the middle-top human evaluation results; 
+          3) <strong>RL-based Distribution Transfer</strong>, enabling style customization by aligning generations with reference domains.
+      </p>
+
+      <h1>Method</h1>
+        <br>
+
+      <img src="./assets/images/pipeline.png" style="width: 60%;">
+
+      <p style="text-align: justify;">
+        Pipeline of Adv-GRPO. The generator is optimized
+        using the GRPO loss, while the discriminator is trained to distin-
+        guish between generated samples and reference images, treated
+        as negative and positive samples, respectively. The discriminator
+        serves as a reward model to provide feedback for the generator.
+    </p>
+
+
+
+      </div>
+    </div>
+
+
+    <!-- Experiments -->
+
+    <div class="album py-5 bg-body-tertiary text-dark">
+      <div class="container col-lg-8 mx-auto">
+      <h1>Experiments</h1>
+        <br>
+
+        <img src="./assets/images/human_eval.png" style="width: 100%;">
+        <p style="text-align: justify;">
+          Human evaluation under PickScore- and OCR-based rewards. Our method Adv-GRPO improves image
+        quality and aesthetics with PickScore reward in a), and for all metrics with OCR reward in b). Compared with the
+        original model (SD3), PickScore reward trade-off aesthetic improvements with image quality degradation in c), OCR
+        reward trade-off text-alignment from aesthetics degradation in d).
+      </p>
+
+        <img src="./assets/images/human_eval_dino.png" style="width: 100%;">
+        <p style="text-align: justify;">
+
+              Human evaluation results under the visual foundation model (DINO) reward. Using a foundation model as
+      the reward, our RL method improves image aesthetics, quality, and text alignment compared with the original SD3
+      model (a), and significantly outperforms Flow-GRPO under the DINO similarity reward (b) and PickScore reward (c).
+      </p>
+      </div>
+
+
+      <!-- Visualizations -->
+      <div class="album py-5 bg-body-tertiary text-dark">
+        <div class="container col-lg-8 mx-auto">
+        <h1>Visualizations</h1>
+          <br>
+
+          <img src="./assets/images/baseline1.png" style="width: 80%;">
+          <p style="text-align: justify; max-width: 80%; margin: 0 auto;">
+              Visualizations under PickScore (left) and OCR (right) rewards. Our method <strong>Adv-GRPO</strong> 
+              effectively mitigates reward hacking in both settings, producing images that better align with human perception 
+              while avoiding the degradation commonly observed in baseline reward-optimized models.
+          </p>
+          
+          <img src="./assets/images/baseline2.png" style="width: 80%;">
+          <p style="text-align: justify; max-width: 80%; margin: 0 auto;">
+              Visualizations using the DINO reward model. With adversarial DINO-based rewards, 
+              <strong>Adv-GRPO</strong> consistently improves overall visual fidelity, demonstrating clearer structure, 
+              richer texture, and more coherent semantics compared to baseline methods.
+          </p>
+          
+          <img src="./assets/images/style_transfer.png" style="width: 80%;">
+          <p style="text-align: justify; max-width: 80%; margin: 0 auto;">
+              Figure 16. Additional style customization results. By leveraging anime reference samples, 
+              <strong>Adv-GRPO</strong> successfully transfers the base model's generation behavior into the target anime domain, 
+              achieving more faithful stylistic alignment guided by the provided examples.
+          </p>
+
+
+
+
+      
+
+
+        <!-- <img src="./assets/images/method.png" style="width: 100%;"> -->
+
+      </div>
+    </div>
+
+  </main>
+
+  <script src="./assets/dist/js/bootstrap.bundle.min.js"></script>
+
+  </body>
+</html>
