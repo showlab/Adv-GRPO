@@ -1,11 +1,28 @@
 <h1 align="center"> The Image as Its Own Reward: <br>
-Reinforcement Learning with Adversarial Reward for Image Generation </h1>
+Reinforcement Learning with Adversarial Reward for Image Generation
+
+<div align="center" style="font-size:16px; line-height:1.35;">
+
+[Weijia Mao](https://scholar.google.com/citations?user=S7bGBmkyNtEC&hl=zh-CN)<sup>1</sup> 
+[Hao Chen](https://haochen-rye.github.io/)<sup>2</sup><sup>✉</sup> 
+[Zhenheng Yang](https://zhenheny.github.io/)<sup>2</sup> 
+[Mike Zheng Shou](https://sites.google.com/view/showlab/home?authuser=0)<sup>1</sup><sup>✉</sup>  
+
+<br>
+
+<sup>1</sup> Show Lab, National University of Singapore,  <sup>2</sup> ByteDance  
+
+<br>
+
+</div>
+
+ </h1>
 <div align="center">
   <a href='https://arxiv.org/abs/2505.05470'><img src='https://img.shields.io/badge/ArXiv-red?logo=arxiv'></a>  &nbsp;
-  <a href='https://gongyeliu.github.io/Flow-GRPO/'><img src='https://img.shields.io/badge/Visualization-green?logo=github'></a> &nbsp;
+  <a href='https://showlab.github.io/Adv-GRPO/'><img src='https://img.shields.io/badge/Visualization-green?logo=github'></a> &nbsp;
   <a href="https://github.com/yifan123/flow_grpo"><img src="https://img.shields.io/badge/Code-9E95B7?logo=github"></a> &nbsp; 
-  <a href='https://huggingface.co/collections/jieliu/sd35m-flowgrpo-68298ec27a27af64b0654120'><img src='https://img.shields.io/badge/Model-blue?logo=huggingface'></a> &nbsp; 
-  <a href='https://huggingface.co/spaces/jieliu/SD3.5-M-Flow-GRPO'><img src='https://img.shields.io/badge/Demo-blue?logo=huggingface'></a> &nbsp;
+  <a href='https://huggingface.co/benzweijia/Adv-GRPO'><img src='https://img.shields.io/badge/Model-blue?logo=huggingface'></a> &nbsp; 
+  <!-- <a href='https://huggingface.co/spaces/jieliu/SD3.5-M-Flow-GRPO'><img src='https://img.shields.io/badge/Demo-blue?logo=huggingface'></a> &nbsp; -->
 </div>
 
 
@@ -13,7 +30,7 @@ Reinforcement Learning with Adversarial Reward for Image Generation </h1>
 ## Adv-GRPO
 
 <p align="center">
-  <img src="assets/teaser.png" alt="Flow-GRPO-Fast Illustration" width=950"/>
+  <img src="assets/teaser.png" alt="Adv-GRPO Illustration" width=950"/>
 </p>
 
 We introduce **Adv-GRPO**, an RL framework with an adversarial reward that iteratively updates
@@ -31,15 +48,13 @@ generations with reference domains
 
 ## Changelog
 
-**2025-11-22**
+**2025-11-25**
 
 * We release the code of Adv-GRPO training code, inference code and the pretrained ckpt.
 
+<!-- 
+## FAQ -->
 
-## FAQ
-
-
-Please use scripts in `scripts/multi_node/sd3_fast` to run these experiments.
 
 ## 🤗 Model
 | Task    | Model |
