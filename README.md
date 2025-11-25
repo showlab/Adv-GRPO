@@ -1,27 +1,23 @@
 <h1 align="center"> The Image as Its Own Reward: <br>
 Reinforcement Learning with Adversarial Reward for Image Generation
 
-<div align="center" style="font-size:12px; line-height:1.35;">
 
-<!-- [Weijia Mao](https://scholar.google.com/citations?user=S7bGBmkyNtEC&hl=zh-CN)<sup>1</sup> 
+
+
+ </h1>
+
+<div align="center" style="font-size:14px; line-height:1.4; margin-top:10px;">
+
+[Weijia Mao](https://scholar.google.com/citations?user=S7bGBmkyNtEC&hl=zh-CN)<sup>1</sup> 
 [Hao Chen](https://haochen-rye.github.io/)<sup>2</sup><sup>✉</sup> 
 [Zhenheng Yang](https://zhenheny.github.io/)<sup>2</sup> 
-[Mike Zheng Shou](https://sites.google.com/view/showlab/home?authuser=0)<sup>1</sup><sup>✉</sup>   -->
+[Mike Zheng Shou](https://sites.google.com/view/showlab/home?authuser=0)<sup>1</sup><sup>✉</sup>  
 
-[Jinheng Xie](https://sierkinhane.github.io/)<sup>1&#42;</sup>&nbsp;
-[Weijia Mao](https://scholar.google.com/citations?hl=zh-CN&user=S7bGBmkyNtEC&view_op=list_works&sortby=pubdate)<sup>1&#42;</sup>&nbsp;
-[Zechen Bai](https://www.baizechen.site/)<sup>1&#42;</sup>&nbsp;
-[David Junhao Zhang](https://junhaozhang98.github.io/)<sup>1&#42;</sup>&nbsp;
-
-<br>
 
 <sup>1</sup> Show Lab, National University of Singapore,  <sup>2</sup> ByteDance  
 
-<br>
-
 </div>
-
- </h1>
+ 
 <div align="center">
   <a href=''><img src='https://img.shields.io/badge/ArXiv-red?logo=arxiv'></a>  &nbsp;
   <a href='https://showlab.github.io/Adv-GRPO/'><img src='https://img.shields.io/badge/Visualization-green?logo=github'></a> &nbsp;
