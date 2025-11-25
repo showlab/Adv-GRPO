@@ -48,6 +48,7 @@ operations = []
 # 遍历文件收集
 for root, _, filenames in os.walk(folder):
     for filename in filenames:
+        print(filename)
         full_path = os.path.join(root, filename)
         repo_path = os.path.relpath(full_path, folder)
 

@@ -1,7 +1,7 @@
 <h1 align="center"> The Image as Its Own Reward: <br>
 Reinforcement Learning with Adversarial Reward for Image Generation
 
-<div align="center" style="font-size:16px; line-height:1.35;">
+<div align="center" style="font-size:12px; line-height:1.35;">
 
 [Weijia Mao](https://scholar.google.com/citations?user=S7bGBmkyNtEC&hl=zh-CN)<sup>1</sup> 
 [Hao Chen](https://haochen-rye.github.io/)<sup>2</sup><sup>✉</sup> 
@@ -18,9 +18,9 @@ Reinforcement Learning with Adversarial Reward for Image Generation
 
  </h1>
 <div align="center">
-  <a href='https://arxiv.org/abs/2505.05470'><img src='https://img.shields.io/badge/ArXiv-red?logo=arxiv'></a>  &nbsp;
+  <a href=''><img src='https://img.shields.io/badge/ArXiv-red?logo=arxiv'></a>  &nbsp;
   <a href='https://showlab.github.io/Adv-GRPO/'><img src='https://img.shields.io/badge/Visualization-green?logo=github'></a> &nbsp;
-  <a href="https://github.com/yifan123/flow_grpo"><img src="https://img.shields.io/badge/Code-9E95B7?logo=github"></a> &nbsp; 
+  <a href=""><img src="https://img.shields.io/badge/Code-9E95B7?logo=github"></a> &nbsp; 
   <a href='https://huggingface.co/benzweijia/Adv-GRPO'><img src='https://img.shields.io/badge/Model-blue?logo=huggingface'></a> &nbsp; 
   <!-- <a href='https://huggingface.co/spaces/jieliu/SD3.5-M-Flow-GRPO'><img src='https://img.shields.io/badge/Demo-blue?logo=huggingface'></a> &nbsp; -->
 </div>
