@@ -16,20 +16,18 @@ Reinforcement Learning with Adversarial Reward for Image Generation </h1>
   <img src="assets/teaser.png" alt="Flow-GRPO-Fast Illustration" width=950"/>
 </p>
 
-
 We introduce **Adv-GRPO**, an RL framework with an adversarial reward that iteratively updates
-both the reward model and the generator. The reward model is supervised using reference images
-as positive samples and can largely avoid being hacked. Unlike KL regularization that constrains
-parameter updates, our learned reward directly guides the generator through its visual outputs,
-leading to higher-quality images. Moreover, while optimizing existing reward functions can alleviate
-reward hacking, their inherent biases remain. For instance, PickScore may degrade image quality,
-whereas OCR-based rewards often reduce aesthetic fidelity. To address this, we take the image itself
-as a reward, using reference images and vision foundation models (e.g., DINO) to provide rich visual
-rewards. These dense visual signals, instead of a single scalar, lead to consistent gains across image
-quality, aesthetics, and task-specific metrics. Finally, we show that combining reference samples with
-foundation-model rewards enables distribution transfer and flexible style customization. In human
-evaluation, our method outperforms Flow-GRPO and SD3, achieving 70.0% and 72.4% win rates in
-image quality and aesthetics, respectively.
+both the reward model and the generator. Our method Adv-GRPO improves text-to-image (T2I) generation in three ways:
+
+ 1) Alleviate Reward Hacking, achieving higher perceptual quality while maintaining comparable benchmark performance
+(e.g., PickScore, OCR), as shown in the top-left human evaluation panel;
+
+ 2) Visual Foundation Model as Reward,
+leveraging visual foundation models (e.g., DINO) for rich visual priors, leading to overall improvements as shown
+in middle-top human evaluation results; 
+
+ 3) RL-based Distribution Transfer, enabling style customization by aligning
+generations with reference domains
 
 ## Changelog
 
@@ -57,7 +55,7 @@ Clone this repository and install packages.
 
 ```bash
 git clone https://github.com/showlab/Adv-GRPO.git
-cd flow_grpo
+cd Adv-GRPO
 conda create -n adv_grpo python=3.10.16 -y
 pip install -e .
 ```
@@ -147,10 +145,15 @@ accelerate launch --config_file scripts/accelerate_configs/deepspeed_zero3.yaml
 #### GRPO
 Single-node training:
 ```bash
-# sd3
-bash scripts/multi_node/sd3_fast/main.sh
+# sd3 grpo with DINO reward
+bash scripts/multi_node/sd3_fast/grpo_dino.sh
 ```
 
+
+```bash
+# sd3 grpo with PickScore reward
+bash scripts/multi_node/sd3_fast/grpo_pickscore.sh
+```
 
 
 

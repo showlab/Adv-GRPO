@@ -167,7 +167,7 @@ def image_similarity_score(device):
         # images = F.interpolate(images, size=(518, 518), mode="bicubic", align_corners=False)
         # DINOv2 normalization
         # images = (images - 0.5) / 0.5
-        images = torch.nn.functional.interpolate(images, size=(512, 512), mode="bicubic", align_corners=False)
+        images = torch.nn.functional.interpolate(images, size=(518, 518), mode="bicubic", align_corners=False)
         mean = torch.tensor([0.485, 0.456, 0.406], device=images.device)[None, :, None, None]
         std  = torch.tensor([0.229, 0.224, 0.225], device=images.device)[None, :, None, None]
         images = (images - mean) / std
@@ -368,67 +368,6 @@ def siglip_cotrain_score(device):
         scores = head(emb).squeeze(-1)
 
         return scores.detach(), {"embeddings": emb.detach()}
-
-    return _fn
-
-def dinov3_patch_cotrain_score(device, n_patches=64):
-    import torch
-    import torch.nn.functional as F
-
-    def _preprocess(images):
-        if not isinstance(images, torch.Tensor):
-            images = torch.tensor(images, dtype=torch.float32)
-        if images.max() > 1.0:
-            images = images / 255.0
-        if images.shape[-1] == 3:  # NHWC -> NCHW
-            images = images.permute(0, 3, 1, 2)
-        images = F.interpolate(images, size=(512, 512), mode="bicubic", align_corners=False)
-        # images = (images - 0.5) / 0.5
-        mean = torch.tensor([0.485, 0.456, 0.406], device=images.device)[None, :, None, None]
-        std  = torch.tensor([0.229, 0.224, 0.225], device=images.device)[None, :, None, None]
-        images = (images - mean) / std
-        return images.to(device).to(torch.bfloat16)
-
-    def _fn(scorer, head, images, prompts, metadata, cls_weight=0.7):
-        images = _preprocess(images)
-        with torch.no_grad():
-            # 提取所有特征: [B, N+1, D]
-            feats = scorer.forward_features(images)
-
-        # --- 分离 CLS 与 patch ---
-        cls_emb = feats[:, 0, :]       # [B, D]
-        patch_emb = feats[:, 1:, :]    # [B, N, D]
-        B, N, D = patch_emb.shape
-
-        # --- 随机采样 patch ---
-        n_select = min(n_patches, N)
-        idx = torch.randint(0, N, (B, n_select), device=device)
-        sampled_patches = torch.gather(
-            patch_emb, 1, idx.unsqueeze(-1).expand(-1, -1, D)
-        )  # [B, n_select, D]
-
-        # --- 归一化 ---
-        cls_emb = cls_emb / (cls_emb.norm(dim=-1, keepdim=True) + 1e-6)
-        sampled_patches = sampled_patches / (sampled_patches.norm(dim=-1, keepdim=True) + 1e-6)
-
-        # --- 计算分数 ---
-        cls_score = head(cls_emb).squeeze(-1)                  # [B]
-        patch_scores = head(sampled_patches).squeeze(-1)       # [B, n_select]
-        patch_score_mean = patch_scores.mean(dim=1)            # [B]
-
-        # --- 混合 reward ---
-        hybrid_score = cls_weight * cls_score + (1 - cls_weight) * patch_score_mean
-        # hybrid_score = hybrid_score.unsqueeze(-1)               # [B, 1]
-
-        # import pdb; pdb.set_trace()
-
-        # --- 返回结果 ---
-        return hybrid_score.detach(), {
-            "cls_score": cls_score.detach(),
-            "patch_scores": patch_scores.detach(),
-            "patch_indices": idx.detach(),
-            "cls_weight": cls_weight,
-        }
 
     return _fn
 
@@ -785,19 +724,17 @@ def constractive_external(device, beta=0.5, top_n=2):
             ref_images = [Image.fromarray(image) for image in ref_images]
         # import pdb; pdb.set_trace()
 
-        # scorer 输出
+        # scorer 
         scores, ref_scores, img_embeds, ref_img_embeds = scorer(prompts, images, ref_images)
 
         # external anchor
         ref_embed = ref_img_embeds.mean(dim=0, keepdim=True)  # (1,D)
         ext_score = ref_scores.mean()
 
-        # 找 group 内 Top-N 最高分的候选
         top_idx = torch.topk(scores, k=min(top_n, len(scores))).indices
         hack_scores = scores[top_idx]
         hack_embeds = img_embeds[top_idx]  # (N,D)
 
-        # 如果 external 已经比所有 hack 分数都高 → 不修正
         if ext_score >= hack_scores.max():
             return scores, {"raw_scores": scores, "ref_scores": ref_scores}
 
@@ -806,7 +743,7 @@ def constractive_external(device, beta=0.5, top_n=2):
         sim_to_hack = torch.nn.functional.cosine_similarity(
             img_embeds.unsqueeze(1), hack_embeds.unsqueeze(0), dim=-1
         )  # (num_images, N)
-        sim_to_hack = sim_to_hack.mean(dim=1)  # 平均 N 个负样本相似度
+        sim_to_hack = sim_to_hack.mean(dim=1)  
 
         adjusted_scores = scores + beta * (sim_to_ext - sim_to_hack)
 
@@ -1094,7 +1031,6 @@ def multi_score(device, score_dict):
         "dino_cotrain":dino_cotrain_score,
         "dino_multi_cotrain": dino_multi_cotrain_score,
         "dino_patch_cotrain": dino_patch_cotrain_score,
-        "dinov3_patch_cotrain": dinov3_patch_cotrain_score,
         "siglip_cotrain": siglip_cotrain_score,
         "siglip_image_similarity": siglip_image_similarity_score
     }

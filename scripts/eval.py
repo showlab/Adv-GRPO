@@ -177,7 +177,7 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
 
     # test_dataloader = itertools.islice(test_dataloader, 2)
     all_rewards = defaultdict(list)
-    file_path = os.path.join(config.test_external_image_path, "prompt2img_node0.json")
+    file_path = os.path.join(config.test_reference_image_path, "prompt2img_node0.json")
     with open(file_path, "r", encoding="utf-8") as f:
         reference_images_dic = json.load(f)
     idx = 0
@@ -259,15 +259,15 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
                         prompt2files_local[prompts[img_idx]] = [filename]
         idx+=1
         rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=False)
-        external_images = []
+        reference_images = []
         for prompt in prompts:
             if prompt in reference_images_dic:
-                file_path =  os.path.join(config.test_external_image_path, reference_images_dic[prompt][0])
+                file_path =  os.path.join(config.test_reference_image_path, reference_images_dic[prompt][0])
             else:
                 file_path = "/mnt/bn/vgfm2/test_dit/weijia/adv_grpo/img0.png"
                 print("flux does exist the images")
-            external_image = Image.open(file_path)
-            external_images.append(external_image)
+            reference_image = Image.open(file_path)
+            reference_images.append(reference_image)
         # import pdb; pdb.set_trace()
         preprocess = transforms.Compose([
             transforms.Resize((512, 512)),
@@ -275,7 +275,7 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
             # transforms.Normalize([0.5], [0.5])  # 映射到 [-1,1]
         ])
 
-        img_tensors = [preprocess(img) for img in external_images]  # list of [3,512,512]
+        img_tensors = [preprocess(img) for img in reference_images]  # list of [3,512,512]
         img_tensor = torch.stack(img_tensors, dim=0).to(accelerator.device, dtype=torch.float32)  # [B,3,512,512]
 
         rewards = executor.submit(reward_fn, images.to(torch.bfloat16), prompts, prompt_metadata, scorer = scorer, only_strict=True, ref_images = img_tensor.to(torch.bfloat16))
@@ -576,7 +576,7 @@ def main(_):
     train_iter = iter(train_dataloader)
     file_path = config.json_path
     with open(file_path, "r", encoding="utf-8") as f:
-        external_images_dic = json.load(f)
+        reference_images_dic = json.load(f)
     pipeline.transformer.eval()
     eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters, scorer)
         

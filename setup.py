@@ -9,8 +9,8 @@ setup(
         "torch==2.6.0",
         "torchvision==0.21.0",
         "torchaudio",
-        "transformers==4.40.0",
-        "accelerate==1.4.0",
+        "transformers==4.54.0",
+        "accelerate==1.9.0",
         "diffusers==0.33.1", 
         
         "numpy==1.26.4",
@@ -30,7 +30,7 @@ setup(
         "matplotlib==3.10.0",
         
         # "flash-attn==2.7.4.post1",
-        "deepspeed==0.16.4",  
+        "deepspeed==0.17.2",  
         "peft==0.10.0",       
         "bitsandbytes==0.45.3",
         
@@ -49,7 +49,9 @@ setup(
         "ml_collections",
         "sentencepiece",
         "openai",
-        "timm"
+        "timm",
+        "gym,"
+        "geomloss"
     ],
     extras_require={
         "dev": [

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en" class="h-100" data-bs-theme="auto">
+  <head><script src="./assets/js/color-modes.js"></script>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Show-o: One Single Transformer To Unify
+    Multimodal Understanding and Generation">
+    <meta name="generator" content="Hugo 0.115.4">
+    <title>Show-o</title>
+
+    <link rel="icon" href="./assets/images/showlab.ico" type="image/x-icon">
+
+    <link rel="canonical" href="https://getbootstrap.com/docs/5.3/examples/cover/">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@3">
+
+<link href="./assets/dist/css/bootstrap.min.css" rel="stylesheet">
+
+
+    <style>
+      
+      .bd-placeholder-img {
+        font-size: 1.125rem;
+        text-anchor: middle;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        user-select: none;
+      }
+
+      @media (min-width: 768px) {
+        .bd-placeholder-img-lg {
+          font-size: 3.5rem;
+        }
+      }
+
+      .b-example-divider {
+        width: 100%;
+        height: 3rem;
+        background-color: rgba(0, 0, 0, .1);
+        border: solid rgba(0, 0, 0, .15);
+        border-width: 1px 0;
+        box-shadow: inset 0 .5em 1.5em rgba(0, 0, 0, .1), inset 0 .125em .5em rgba(0, 0, 0, .15);
+      }
+
+      .b-example-vr {
+        flex-shrink: 0;
+        width: 1.5rem;
+        height: 100vh;
+      }
+
+      .bi {
+        vertical-align: -.125em;
+        fill: currentColor;
+      }
+
+      .nav-scroller {
+        position: relative;
+        z-index: 2;
+        height: 2.75rem;
+        overflow-y: hidden;
+      }
+
+      .nav-scroller .nav {
+        display: flex;
+        flex-wrap: nowrap;
+        padding-bottom: 1rem;
+        margin-top: -1px;
+        overflow-x: auto;
+        text-align: center;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .btn-bd-primary {
+        --bd-violet-bg: #712cf9;
+        --bd-violet-rgb: 112.520718, 44.062154, 249.437846;
+
+        --bs-btn-font-weight: 600;
+        --bs-btn-color: var(--bs-white);
+        --bs-btn-bg: var(--bd-violet-bg);
+        --bs-btn-border-color: var(--bd-violet-bg);
+        --bs-btn-hover-color: var(--bs-white);
+        --bs-btn-hover-bg: #6528e0;
+        --bs-btn-hover-border-color: #6528e0;
+        --bs-btn-focus-shadow-rgb: var(--bd-violet-rgb);
+        --bs-btn-active-color: var(--bs-btn-hover-color);
+        --bs-btn-active-bg: #5a23c8;
+        --bs-btn-active-border-color: #5a23c8;
+      }
+      .bd-mode-toggle {
+        z-index: 1500;
+      }
+
+      .text-highlight {
+        color: #e06766;
+      }
+    </style>
+
+
+    <!-- Custom styles for this template -->
+    <link href="./assets/cover.css" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+  </head>
+  <body class="text-center  text-bg-dark">
+    <svg xmlns="http://www.w3.org/2000/svg" class="d-none">
+      <symbol id="check2" viewBox="0 0 16 16">
+        <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+      </symbol>
+      <symbol id="circle-half" viewBox="0 0 16 16">
+        <path d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/>
+      </symbol>
+      <symbol id="moon-stars-fill" viewBox="0 0 16 16">
+        <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/>
+        <path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/>
+      </symbol>
+      <symbol id="sun-fill" viewBox="0 0 16 16">
+        <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
+      </symbol>
+    </svg>
+    
+
+
+  <main>
+
+    <section class="text-center container min-vh-0">
+
+        <div class="row py-5">
+            
+            <div class="mx-auto" style="margin-top: 5%; filter: saturate(1); opacity: 0.90;">
+                <h1 class="display-2 fw-bold title">
+                  <a style="color: #70a8dc;">S</a><a style="color: #6fb051;">h</a><a style="color: #e06766;">o</a><a style="color: #f7b26b;">w</a>-o: 
+                  <a class="display-4">One Single Transformer To Unify Multimodal Understanding and Generation</a>
+                </h1>
+                <p class="author-list">
+                    <a href='https://sierkinhane.github.io/' target='_blank'>Jinheng Xie<sup>1</sup><sup>*</sup></a>&emsp;
+                    <a href='https://scholar.google.com/citations?user=S7bGBmkyNtEC&hl=zh-CN' target='_blank'>Weijia Mao<sup>1</sup><sup>*</sup></a>&emsp;
+                    <a href='https://www.baizechen.site/' target='_blank'>Zechen Bai<sup>1</sup><sup>*</sup></a>&emsp;
+                    <a href='https://junhaozhang98.github.io/' target='_blank'>Junhao Zhang<sup>1</sup><sup>*</sup></a>
+                    <br>
+                    <a>Weihao Wang<sup>2</sup></a>&emsp;
+                    <a href='https://qinghonglin.github.io/' target='_blank'>Kevin Qinghong Lin<sup>1</sup></a>&emsp;
+                    <a href='https://ycgu.site/' target='_blank'>Yuchao Gu<sup>1</sup></a>&emsp;
+                    <a>Zhijie Chen<sup>2</sup></a>&emsp;
+                    <a href='https://zhenheny.github.io/' target='_blank'>Zhenheng Yang<sup>2</sup></a>&emsp;
+
+                    <a href='https://sites.google.com/view/showlab/home?authuser=0' target='_blank'>Mike Zheng Shou<sup>1</sup><sup>&#x2709</sup></a>
+                </p>
+                <p class="institution-list">
+                    <a href='https://sites.google.com/view/showlab/home?authuser=0' target='_blank'><sup>1</sup>Show Lab, National University of Singapore  </a>
+                    <a><sup>2</sup>ByteDance</a>
+                    <br>
+                    <small><sup>*</sup> Equal Contribution</small>&emsp;
+                    <small><sup>&#x2709</sup> Corresponding Author</small>
+                </p>
+                <p>
+                
+                <a href="https://github.com/showlab/Show-o" class="btn btn-outline-light">
+                    Code
+                </a>
+                <a href="https://arxiv.org/pdf/2408.12528" class="btn btn-outline-light">
+                    arXiv
+                </a>
+                <a href="https://showlab.github.io/Show-o/assets/show-o.pdf" class="btn btn-outline-light">
+                    PDF
+                </a>
+                <a href="https://huggingface.co/spaces/showlab/Show-o" class="btn btn-outline-light">
+                    Gradio
+              </a>
+                </p>
+            </div>
+        </div>
+    </section>
+  
+
+    <div class="album py-5 col-lg-5 mx-auto text-bg-dark">
+        <div class="container">
+            <h1>Abstract</h1>
+<!-- 
+            <p style="text-align: justify;">
+
+              
+              We present a unified transformer, i.e., Show-o, that unifies multimodal understanding and generation. Unlike fully autoregressive models, Show-o unifies au
+              toregressive and (discrete) diffusion modeling to adaptively handle inputs and outputs of various and mixed modalities. The unified model flexibly supports a wide
+              range of vision-language tasks including visual question-answering, text-to-image
+              generation, text-guided inpainting/extrapolation, and mixed-modality generation.
+              Across various benchmarks, it demonstrates comparable or superior performance
+              to existing individual models tailored for understanding or generation, which with
+              an equivalent or larger number of parameters. This signifiantly highlights its potential as a next-generation foundation model. Code and models are released at
+              <a href='https://github.com/showlab/Show-o' target='_blank'>https://github.com/showlab/Show-o</a>.
+            </p> -->
+
+            <p style="text-align: justify;">
+              We present a unified transformer, i.e., Show-o, that unifies multimodal understanding and generation. Unlike fully autoregressive models, Show-o unifies autoregressive and (discrete) diffusion modeling to adaptively handle inputs and outputs of various and mixed modalities. The unified model flexibly supports a wide range of vision-language tasks including visual question-answering, text-to-image generation, text-guided inpainting/extrapolation, and mixed-modality generation. Across various benchmarks, it demonstrates comparable or superior performance to existing individual models with an equivalent or larger number of parameters tailored for understanding or generation. This significantly highlights its potential as a next-generation foundation model.
+            </p> 
+
+        </div>
+    </div>
+
+
+
+    <div class="album py-5 bg-body-tertiary text-dark" >
+
+      <div class="container col-lg-6 mx-auto" style="background-color: #f0f0f0;">
+
+        <h1 style="background-color: #f0f0f0;">What's new of Show-o?</h1>
+
+        <img src="./assets/images/comparison.png" style="width: 100%;">
+      </div>
+    </div>
+
+
+
+    <div class="album py-5 bg-body-tertiary text-dark " >
+      <div class="container col-lg-6 mx-auto" style="background-color: #f0f0f0;">
+
+        <h1 style="background-color: #f0f0f0;">Method</h1>
+        <p style="text-align: justify; background-color: #f0f0f0">
+          We present a novel unified model, i.e., <a style="color: #70a8dc;">S</a><a style="color: #6fb051;">h</a><a style="color: #e06766;">o</a><a style="color: #f7b26b;">w</a>-o,
+          capable of addressing both multimodal understanding and generation tasks simultaneously with mixed auto-regressive and diffusion modeling.
+        </p>
+
+        <video class="card-img-top card-img-bottom" muted autoplay="autoplay" loop="loop" width="100%">
+          <source src="./assets/videos/Show-o.mp4" type="video/mp4">
+        </video>
+
+      </div>
+    </div>
+
+    <div class="album py-5 bg-body-tertiary text-dark ">
+
+      <div class="container col-lg-6 mx-auto" style="background-color: #f0f0f0;">
+
+        <h1 style="background-color: #f0f0f0;">Text-to-Image Results</h1>
+        <img src="./assets/images/github_t2i.png" style="width: 100%;background-color: #f0f0f0;">
+
+        <h1 style="background-color: #f0f0f0;">Multimodal Understanding Results</h1>
+        <img src="./assets/images/github_mmu.png" style="width: 100%;background-color: #f0f0f0;">
+
+        <h1 style="background-color: #f0f0f0;">Inpainting Results</h1>
+        <img src="./assets/images/github_inpainting.png" style="width: 100%;background-color: #f0f0f0;">
+        <h1 style="background-color: #f0f0f0;">Extrapolation Results</h1>
+
+        <img src="./assets/images/github_extrapolation.png" style="width: 100%; background-color: #f0f0f0;">
+        <!-- <img src="./assets/images/understanding_result.png" style="width: 100%;"> -->
+      </div>
+    </div>
+
+    <div class="album py-5 bg-body-tertiary text-dark">
+      <div class="container col-lg-6 mx-auto" style="background-color: #f0f0f0;">
+
+        <h1 style="background-color: #f0f0f0;">Experiments</h1>
+        <img src="./assets/images/understanding.png" style="width: 100%;">
+        <img src="./assets/images/geneval_result.png" style="width: 100%;">
+        
+      </div>
+    </div>
+
+
+    <div class="album py-5 bg-body-tertiary text-dark ">
+
+      <div class="container col-lg-6 mx-auto" style="background-color: #f0f0f0;">
+
+        <h1 style="background-color: #f0f0f0;">Comparison</h1>
+
+        <img src="./assets/images/generation_result.png" style="width: 100%;">
+        <img src="./assets/images/understanding_result.png" style="width: 100%;">
+      </div>
+    </div>
+
+
+
+  </main>
+
+
+<script>
+    $(document).ready(function() {
+        $('#loadMoreBtn').click(function() {
+            const hiddenItems = $('[data-item]:hidden');
+            hiddenItems.slice(0, 6).fadeIn(); // Adjust this number to show more or fewer items
+
+            // Optionally hide the "Load More" button if there are no more hidden items
+            if (hiddenItems.length <= 6) {
+                $('#loadMoreBtn').fadeOut();
+            }
+        });
+    });
+</script>
+
+<script>
+  // Function to shuffle an array randomly
+  function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+      }
+  }
+
+  // Get all the video elements and shuffle their order
+  const videoContainer = document.getElementById('video-container');
+  const videoElements = Array.from(videoContainer.querySelectorAll('.col[data-item]'));
+  shuffleArray(videoElements);
+
+  // Append the shuffled video elements back to the container
+  videoElements.forEach((element) => {
+      videoContainer.appendChild(element);
+  });
+</script>
+
+<script src="./assets/dist/js/bootstrap.bundle.min.js"></script>
+
+    </body>
+</html>

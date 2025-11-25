@@ -14,12 +14,12 @@ from accelerate.logging import get_logger
 from diffusers import StableDiffusion3Pipeline
 from diffusers.utils.torch_utils import is_compiled_module
 import numpy as np
-import flow_grpo.prompts
-import flow_grpo.rewards
-from flow_grpo.stat_tracking import PerPromptStatTracker
-from flow_grpo.diffusers_patch.sd3_pipeline_with_logprob_fast import pipeline_with_logprob_random as pipeline_with_logprob
-from flow_grpo.diffusers_patch.sd3_sde_with_logprob import sde_step_with_logprob_new as sde_step_with_logprob
-from flow_grpo.diffusers_patch.train_dreambooth_lora_sd3 import encode_prompt
+import adv_grpo.prompts
+import adv_grpo.rewards
+from adv_grpo.stat_tracking import PerPromptStatTracker
+from adv_grpo.diffusers_patch.sd3_pipeline_with_logprob_fast import pipeline_with_logprob_random as pipeline_with_logprob
+from adv_grpo.diffusers_patch.sd3_sde_with_logprob import sde_step_with_logprob_new as sde_step_with_logprob
+from adv_grpo.diffusers_patch.train_dreambooth_lora_sd3 import encode_prompt
 import torch
 import wandb
 from functools import partial
@@ -29,16 +29,13 @@ from PIL import Image
 from peft import LoraConfig, get_peft_model, set_peft_model_state_dict, PeftModel
 import random
 from torch.utils.data import Dataset, DataLoader, Sampler
-from flow_grpo.ema import EMAModuleWrapper
-from flow_grpo.stylegan_discriminator import StyleGANImageDiscriminator
-from flow_grpo.patchgan_discriminator import PatchGANImageDiscriminator
+from adv_grpo.ema import EMAModuleWrapper
 
 from torchvision import transforms
 import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel as DDP
-from flow_grpo.grpo_discriminator import GRPOWithDiscriminator
-from flow_grpo.pickscore_scorer import PickScoreScorer
-from flow_grpo.pick_score_training import CLIPCriterionConfig, CLIPCriterion
+from adv_grpo.pickscore_scorer import PickScoreScorer
+from adv_grpo.pick_score_training import CLIPCriterionConfig, CLIPCriterion
 
 tqdm = partial(tqdm.tqdm, dynamic_ncols=True)
 
@@ -98,7 +95,6 @@ class DistributedKRepeatSampler(Sampler):
         
         # Compute the number of unique samples needed per iteration
         self.total_samples = self.num_replicas * self.batch_size
-        # import pdb; pdb.set_trace()
         assert self.total_samples % self.k == 0, f"k can not divide n*b, k{k}-num_replicas{num_replicas}-batch_size{batch_size}"
         self.m = self.total_samples // self.k  # Number of unique samples
         self.epoch = 0
@@ -154,10 +150,6 @@ def tensor_to_pil_list(tensor_imgs):
 
 def train_pickscore(scorer, prompts, real_data, fake_data, optimizer, accelerator):
 
-    # import pdb; pdb.set_trace()
-    # qwen_img = Image.open(sd3_img_path).convert("RGB")
-    # sd3_img = Image.open(sd3_img_path).convert("RGB")
-    # print("prompts:", len(prompts))
 
     text_inputs = scorer.processor.tokenizer(
         prompts,
@@ -167,7 +159,6 @@ def train_pickscore(scorer, prompts, real_data, fake_data, optimizer, accelerato
         return_tensors="pt"
     )
     input_ids = text_inputs["input_ids"].squeeze(0).to(accelerator.device)
-    # 图像预处理
     pixels_0 = scorer.processor(images=real_data, return_tensors="pt")["pixel_values"].squeeze(0).to(accelerator.device)
     pixels_1 = scorer.processor(images=fake_data, return_tensors="pt")["pixel_values"].squeeze(0).to(accelerator.device)
     # print("pixels_0",pixels_0.shape)
@@ -175,8 +166,8 @@ def train_pickscore(scorer, prompts, real_data, fake_data, optimizer, accelerato
 
     batch = {
             "input_ids": input_ids,
-            "pixels_0": pixels_0,  # 正样本 (Qwen)
-            "pixels_1": pixels_1,  # 负样本 (SD3)
+            "pixels_0": pixels_0,  
+            "pixels_1": pixels_1,  
             "label_0": torch.tensor(1.0).to(accelerator.device),  
             "label_1": torch.tensor(0.0).to(accelerator.device),
             "num_examples_per_prompt": torch.tensor(1.0).to(accelerator.device)
@@ -437,7 +428,7 @@ def main(_):
     if accelerator.is_main_process:
         if config.wandb_init:
             wandb.init(
-                project="flow_grpo",
+                project="adv_grpo",
                 name=f"case_{config.case_name}", 
             )
         else:
@@ -520,32 +511,10 @@ def main(_):
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
 
 
-    if config.discriminator == "stylegan":
-        scorer = StyleGANImageDiscriminator(
-            base_channel=64,
-            image_size=(512, 512),
-            channel_multipliers=(2, 4, 8, 8, 8, 8),
-            blur_resample="blur",
-            use_gradfix=False
-        ).to(accelerator.device)
-    elif config.discriminator == "patchgan":
-        scorer = PatchGANImageDiscriminator(
-            input_nc=3,         # 输入通道数，通常是RGB
-            ndf=64,             # 基础通道数
-            n_layers=3,         # PatchGAN默认3~4层即可
-            kw=4,               # 卷积核大小
-            padw=1,             # padding
-            use_bias=False,
-            norm_type="BatchNorm",
-        ).to(accelerator.device)
-    else:
-        scorer = PickScoreScorer(dtype=torch.bfloat16, device=accelerator.device)
-
-
-
+    scorer = PickScoreScorer(dtype=torch.bfloat16, device=accelerator.device)
     scorer.requires_grad = True
 
-    # weight_path = "/mnt/bn/vgfm2/test_dit/weijia/flow_grpo/stylegan_discriminator.pth"
+    # weight_path = "/mnt/bn/vgfm2/test_dit/weijia/adv_grpo/stylegan_discriminator.pth"
     weight_path = config.weight_path
     # weight_path = None
     if weight_path is not None:
@@ -593,8 +562,8 @@ def main(_):
 
 
     # prepare prompt and reward fn
-    reward_fn = getattr(flow_grpo.rewards, 'multi_score')(accelerator.device, config.reward_fn)
-    eval_reward_fn = getattr(flow_grpo.rewards, 'multi_score')(accelerator.device, config.eval_reward_fn)
+    reward_fn = getattr(adv_grpo.rewards, 'multi_score')(accelerator.device, config.reward_fn)
+    eval_reward_fn = getattr(adv_grpo.rewards, 'multi_score')(accelerator.device, config.eval_reward_fn)
     # import pdb; pdb.set_trace()
 
     if config.prompt_fn == "general_ocr":
@@ -733,13 +702,11 @@ def main(_):
     global_step = 0
     train_iter = iter(train_dataloader)
 
-    # file_path = os.path.join(config.external_image_path,"prompt2img.json")
-    # file_path = "/mnt/bn/vgfm2/test_dit/weijia/flow_grpo/prompt2img_merged.json"
     file_path = config.json_path
     with open(file_path, "r", encoding="utf-8") as f:
-        external_images_dic = json.load(f)
+        reference_images_dic = json.load(f)
     
-    while True:
+    while global_step<1000:
         # #################### EVAL ####################
         pipeline.transformer.eval()
         if (epoch) % config.eval_freq == 0:
@@ -752,7 +719,7 @@ def main(_):
         samples = []
         prompts = []
         generated_imgs = []
-        external_imgs = []
+        reference_imgs = []
         for i in tqdm(
             range(config.sample.num_batches_per_epoch),
             desc=f"Epoch {epoch}: sampling",
@@ -803,24 +770,24 @@ def main(_):
                         sample_num_steps=config.sample.num_steps,
                         random_timestep = config.sample.random_timestep,
                     )
-                    if prompts[0] in external_images_dic:
-                        file_list = external_images_dic[prompts[0]]  # 这是一个list
-                        external_images = []
+                    if prompts[0] in reference_images_dic:
+                        file_list = reference_images_dic[prompts[0]] 
+                        reference_images = []
                         for fname in file_list:
-                            fpath = os.path.join(config.external_image_path, fname)
+                            fpath = os.path.join(config.reference_image_path, fname)
                             try:
                                 img = Image.open(fpath).convert("RGB")
-                                external_images.append(img)
+                                reference_images.append(img)
                             except Exception as e:
                                 print(f"[Error] Failed to open {fpath}: {e}")
-                                default_path = "/mnt/bn/vgfm2/test_dit/weijia/flow_grpo/img.png"
+                                default_path = "/mnt/bn/vgfm2/test_dit/weijia/adv_grpo/img.png"
                                 img = Image.open(default_path).convert("RGB")
-                                external_images.append(img)
+                                reference_images.append(img)
                     else:
                         # 用默认图片兜底
                         print(f"[Warning] external image not found for prompt: {prompts[0]}")
-                        default_path = "/mnt/bn/vgfm2/test_dit/weijia/outputs/qwen_images_ocr_8/node0_rank0_00001_0.png"
-                        external_images = [Image.open(default_path).convert("RGB")]*8
+                        # default_path = "/mnt/bn/vgfm2/test_dit/weijia/outputs/qwen_images_ocr_8/node0_rank0_00001_0.png"
+                        # reference_images = [Image.open(default_path).convert("RGB")]*8
                     
                     preprocess = transforms.Compose([
                         transforms.Resize((512, 512)),
@@ -828,20 +795,12 @@ def main(_):
                         # transforms.Normalize([0.5], [0.5])  # 映射到 [-1,1]
                     ])
                     # 批量处理
-                    img_tensors = [preprocess(img) for img in external_images]  # list of [3,512,512]
+                    img_tensors = [preprocess(img) for img in reference_images]  # list of [3,512,512]
                     img_tensor = torch.stack(img_tensors, dim=0).to(accelerator.device, dtype=torch.float32)  # [B,3,512,512]
                     generated_imgs.append(images)
-                    external_imgs.append(img_tensor)
-                    # import pdb; pdb.set_trace()
+                    reference_imgs.append(img_tensor)
 
-                    
-                    # end = time.time()
-                    # print("运行时间: {:.2f} 秒".format(end - start))
-                    # print("images dtype:", images[0].dtype)
-                    # print("latents dtype:", latents[0].dtype)
-                    # print("log_probs dtype:", log_probs[0].dtype)
-                    # print("timesteps dtype:", timesteps[0].dtype)
-                    # import pdb; pdb.set_trace()
+
 
 
             latents = torch.stack(
@@ -855,11 +814,7 @@ def main(_):
             )
 
             rewards = executor.submit(reward_fn, images.to(torch.bfloat16), prompts, prompt_metadata, scorer = scorer, only_strict=True)
-            external_rewards = executor.submit(reward_fn, img_tensor.to(torch.bfloat16), prompts, prompt_metadata, scorer = scorer, only_strict=True)
-            # import pdb; pdb.set_trace()
-            # rewards = reward_fn(images.to(torch.bfloat16), prompts, prompt_metadata, scorer = scorer, only_strict=True)
-            # import pdb; pdb.set_trace()
-            # yield to to make sure reward computation starts
+            reference_rewards = executor.submit(reward_fn, img_tensor.to(torch.bfloat16), prompts, prompt_metadata, scorer = scorer, only_strict=True)
             time.sleep(0)
             samples.append(
                 {
@@ -875,7 +830,7 @@ def main(_):
                     ],  # each entry is the latent after timestep t
                     "log_probs": log_probs,
                     "rewards": rewards,
-                    "external_rewards": external_rewards,
+                    "reference_rewards": reference_rewards,
                 }
             )
 
@@ -888,16 +843,16 @@ def main(_):
             position=0,
         ):
             rewards, reward_metadata = sample["rewards"].result()
-            external_rewards, external_reward_metadata = sample["external_rewards"].result()
+            reference_rewards, reference_reward_metadata = sample["reference_rewards"].result()
             # accelerator.print(reward_metadata)
             # import pdb; pdb.set_trace()
             sample["rewards"] = {
                 key: torch.as_tensor(value, device=accelerator.device).float()
                 for key, value in rewards.items()
             }
-            sample["external_rewards"] = {
+            sample["reference_rewards"] = {
                 key: torch.as_tensor(value, device=accelerator.device).float()
-                for key, value in external_rewards.items()
+                for key, value in reference_rewards.items()
             }
 
         # collate samples into dict where each entry has shape (num_batches_per_epoch * sample.batch_size, ...)
@@ -958,7 +913,7 @@ def main(_):
 
                 wandb.log(
                     {
-                        "external_images": [
+                        "reference_images": [
                             wandb.Image(
                                 os.path.join(tmpdir, f"{idx}.jpg"),
                             )
@@ -975,12 +930,12 @@ def main(_):
         gathered_rewards = {key: accelerator.gather(value) for key, value in samples["rewards"].items()}
         gathered_rewards = {key: value.cpu().numpy() for key, value in gathered_rewards.items()}
 
-        samples["external_rewards"]["ori_avg"] = samples["external_rewards"]["avg"]
+        samples["reference_rewards"]["ori_avg"] = samples["reference_rewards"]["avg"]
         # The purpose of repeating `adv` along the timestep dimension here is to make it easier to introduce timestep-dependent advantages later, such as adding a KL reward.
-        samples["external_rewards"]["avg"] = samples["external_rewards"]["avg"].unsqueeze(1).repeat(1, config.sample.train_num_steps)
+        samples["reference_rewards"]["avg"] = samples["reference_rewards"]["avg"].unsqueeze(1).repeat(1, config.sample.train_num_steps)
         # gather rewards across processes
-        gathered_external_rewards = {key: accelerator.gather(value) for key, value in samples["external_rewards"].items()}
-        gathered_external_rewards = {key: value.cpu().numpy() for key, value in gathered_external_rewards.items()}
+        gathered_reference_rewards = {key: accelerator.gather(value) for key, value in samples["reference_rewards"].items()}
+        gathered_reference_rewards = {key: value.cpu().numpy() for key, value in gathered_reference_rewards.items()}
 
         # log rewards and images
         if accelerator.is_main_process:
@@ -994,7 +949,7 @@ def main(_):
             wandb.log(
                 {
                     "epoch": epoch,
-                    **{f"external_reward_{key}": value.mean() for key, value in gathered_external_rewards.items() if '_strict_accuracy' not in key and '_accuracy' not in key},
+                    **{f"reference_reward_{key}": value.mean() for key, value in gathered_reference_rewards.items() if '_strict_accuracy' not in key and '_accuracy' not in key},
                 },
                 step=global_step,
             )
@@ -1045,15 +1000,15 @@ def main(_):
         if accelerator.is_local_main_process:
             print("advantages: ", samples["advantages"].abs().mean())
         
-        external_imgs = torch.cat(external_imgs, dim=0)  # [N, 3, 512, 512]
+        reference_imgs = torch.cat(reference_imgs, dim=0)  # [N, 3, 512, 512]
         generated_imgs = torch.cat(generated_imgs, dim=0)  # [N, 3, 512, 512]
 
-        external_imgs = (external_imgs - 0.5) * 2.0
+        reference_imgs = (reference_imgs - 0.5) * 2.0
         generated_imgs = (generated_imgs - 0.5) * 2.0
         rewards_mean = accelerator.gather(samples["rewards"]['pickscore_cotrain']).mean()
 
 
-        external_rewards_mean = accelerator.gather(samples["external_rewards"]['pickscore_cotrain']).mean()
+        reference_rewards_mean = accelerator.gather(samples["reference_rewards"]['pickscore_cotrain']).mean()
 
 
         # rewards
@@ -1067,11 +1022,11 @@ def main(_):
         transformer.requires_grad = False
         # if config.train_d:
         # if config.train_d and (epoch+1)%config.d_times==0:
-        if config.train_d and external_rewards_mean < rewards_mean:
+        if config.train_d and reference_rewards_mean < rewards_mean:
             # import pdb; pdb.set_trace()
-            external_imgs_pil = tensor_to_pil_list(external_imgs)
+            reference_imgs_pil = tensor_to_pil_list(reference_imgs)
             generated_imgs_pil = tensor_to_pil_list(generated_imgs)
-            d_loss= train_pickscore(scorer, prompts_per_gpu, external_imgs_pil, generated_imgs_pil, optimizer_D, accelerator)
+            d_loss= train_pickscore(scorer, prompts_per_gpu, reference_imgs_pil, generated_imgs_pil, optimizer_D, accelerator)
 
             # import pdb; pdb.set_trace()
             if accelerator.is_main_process:
@@ -1081,42 +1036,6 @@ def main(_):
             epoch+=1
             continue
 
-        # if config.train_d and external_rewards_mean < rewards_mean:
-        #     ext_scores = samples["external_rewards"]['pickscore_cotrain']# [B]
-        #     gen_scores = samples["rewards"]['pickscore_cotrain']# [B]
-        #     mask = gen_scores > ext_scores  # [B] bool 张量
-        #     external_imgs_pil = tensor_to_pil_list(external_imgs)
-        #     generated_imgs_pil = tensor_to_pil_list(generated_imgs)
-        #     filtered_ext_imgs = []
-        #     filtered_gen_imgs = []
-        #     filtered_prompts = []
-        #     for p, ext_img, gen_img, keep in zip(prompts_per_gpu, external_imgs_pil, generated_imgs_pil, mask):
-        #         if keep:  # 只保留 gen_score > ext_score 的 pair
-        #             filtered_ext_imgs.append(ext_img)
-        #             filtpered_gen_imgs.append(gen_img)
-        #             filtered_prompts.append(p)
-        #     # import pdb; pdb.set_trace()
-
-        #     if mask.sum() == 0:
-        #         # 本卡没有负样本，避免报错
-        #         d_loss = torch.tensor(0.0, device=accelerator.device, requires_grad=True)
-        #         optimizer_D.zero_grad()
-        #         accelerator.backward(d_loss)
-        #         optimizer_D.step()
-        #     else:
-        #         # 只保留分数更高的 generated 
-
-        #         # ======= 3. 训练 PickScore =======
-        #         d_loss = train_pickscore(
-        #             scorer,
-        #             filtered_prompts,
-        #             filtered_ext_imgs,
-        #             filtered_gen_imgs,
-        #             optimizer_D,
-        #             accelerator
-        #         )
-        # import pdb; pdb.set_trace()
-
 
 
 
@@ -1124,7 +1043,7 @@ def main(_):
         transformer.requires_grad = True
 
         del samples["rewards"]
-        del samples["external_rewards"]
+        del samples["reference_rewards"]
         del samples["prompt_ids"]
 
         total_batch_size, num_timesteps = samples["timesteps"].shape
@@ -1243,7 +1162,6 @@ def main(_):
                         info["loss"].append(loss)
 
                         # backward pass
-                        # import pdb; pdb.set_trace()
                         accelerator.backward(loss)
                         if accelerator.sync_gradients:
                             accelerator.clip_grad_norm_(
