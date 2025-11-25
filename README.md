@@ -3,10 +3,15 @@ Reinforcement Learning with Adversarial Reward for Image Generation
 
 <div align="center" style="font-size:12px; line-height:1.35;">
 
-[Weijia Mao](https://scholar.google.com/citations?user=S7bGBmkyNtEC&hl=zh-CN)<sup>1</sup> 
+<!-- [Weijia Mao](https://scholar.google.com/citations?user=S7bGBmkyNtEC&hl=zh-CN)<sup>1</sup> 
 [Hao Chen](https://haochen-rye.github.io/)<sup>2</sup><sup>✉</sup> 
 [Zhenheng Yang](https://zhenheny.github.io/)<sup>2</sup> 
-[Mike Zheng Shou](https://sites.google.com/view/showlab/home?authuser=0)<sup>1</sup><sup>✉</sup>  
+[Mike Zheng Shou](https://sites.google.com/view/showlab/home?authuser=0)<sup>1</sup><sup>✉</sup>   -->
+
+[Jinheng Xie](https://sierkinhane.github.io/)<sup>1&#42;</sup>&nbsp;
+[Weijia Mao](https://scholar.google.com/citations?hl=zh-CN&user=S7bGBmkyNtEC&view_op=list_works&sortby=pubdate)<sup>1&#42;</sup>&nbsp;
+[Zechen Bai](https://www.baizechen.site/)<sup>1&#42;</sup>&nbsp;
+[David Junhao Zhang](https://junhaozhang98.github.io/)<sup>1&#42;</sup>&nbsp;
 
 <br>
 
