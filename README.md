@@ -19,7 +19,7 @@ Reinforcement Learning with Adversarial Reward for Image Generation
 </div>
  
 <div align="center">
-  <a href=''><img src='https://img.shields.io/badge/ArXiv-red?logo=arxiv'></a>  &nbsp;
+  <a href='https://arxiv.org/abs/2511.20256'><img src='https://img.shields.io/badge/ArXiv-red?logo=arxiv'></a>  &nbsp;
   <a href='https://showlab.github.io/Adv-GRPO/'><img src='https://img.shields.io/badge/Visualization-green?logo=github'></a> &nbsp;
   <a href=""><img src="https://img.shields.io/badge/Code-9E95B7?logo=github"></a> &nbsp; 
   <a href='https://huggingface.co/benzweijia/Adv-GRPO'><img src='https://img.shields.io/badge/Model-blue?logo=huggingface'></a> &nbsp; 
@@ -112,6 +112,25 @@ The reference images will be saved in output_dir and the json file will be like 
 ```
 
 
+
+And if you do not want to generate, you can use our reference datasets. 
+
+
+[🤗Reference Dataset](https://huggingface.co/datasets/benzweijia/QWen_Image_PickScore) |
+
+
+Some tips:
+
+- Our reference dataset is relatively large — the full set is about 50 GB if you choose to download it.
+
+- In practice, we do not use all images during training. Similarly, not all prompts are covered when using DINO prompts.
+
+- Based on our ablation studies, using a smaller subset of reference images and prompts can still achieve comparable performance to using the full dataset.
+
+- If you prefer not to use our dataset or have a better alternative, you can use your own dataset and simply adapt it to the required format.
+
+
+
 ### 2. Inferece Stage.
 
 Firstly, we set the config file  .config/grpo.py
@@ -174,15 +193,16 @@ bash scripts/multi_node/sd3_fast/grpo_pickscore.sh
 
 
         
-## ✨ Important Hyperparameters
-You can adjust the parameters in `config/grpo.py` to tune different hyperparameters. An empirical finding is that `config.sample.train_batch_size * num_gpu / config.sample.num_image_per_prompt * config.sample.num_batches_per_epoch = 48`, i.e., `group_number=48`, `group_size=24`.
-Additionally, setting `config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch // 2`.
+## ✨ Important Tips
+1. You can adjust the parameters in `config/grpo.py` to tune different hyperparameters. 
+
 
 ## 🤗 Acknowledgement
 This repo is based on [Flow-GRPO](https://github.com/yifan123/flow_grpo.git) . We thank the authors for their valuable contributions to the AIGC community.
 
 ## ⭐Citation
 If you find Adv-GRPO useful for your research or projects, we would greatly appreciate it if you could cite the following paper:
+
 ```
 
 ```
