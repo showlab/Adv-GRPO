@@ -24,6 +24,8 @@ Reinforcement Learning with Adversarial Reward for Image Generation
   <a href=""><img src="https://img.shields.io/badge/Code-9E95B7?logo=github"></a> &nbsp; 
   <a href='https://huggingface.co/benzweijia/Adv-GRPO'><img src='https://img.shields.io/badge/Model-blue?logo=huggingface'></a> &nbsp; 
   <!-- <a href='https://huggingface.co/spaces/jieliu/SD3.5-M-Flow-GRPO'><img src='https://img.shields.io/badge/Demo-blue?logo=huggingface'></a> &nbsp; -->
+  <a href='https://showlab.github.io/Adv-GRPO/assets/Adv-GRPO.pdf'><img src='https://img.shields.io/badge/PDF-orange?logo=adobeacrobatreader'></a> &nbsp;
+
 </div>
 
 
