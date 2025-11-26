@@ -142,10 +142,18 @@ def eval_sd3_fast():
      config.train.lora_path = ""
     config.save_folder = ""
     config.json_path = ""
-    config.external_image_path = ""
-    config.test_external_image_path = ""
+    config.reference_image_path = ""
+    config.test_reference_image_path = ""
     ...
+
 ```
+
+- `lora_path`: LoRA checkpoint path  
+- `save_folder`: Output directory  
+- `json_path`: JSON metadata file (often same as `reference_image_path`)  
+- `reference_image_path`: Reference images for inference (optional)  
+- `test_reference_image_path`: Test-time reference images (optional)
+
 
 
 Secondly, 
