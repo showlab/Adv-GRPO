@@ -188,7 +188,13 @@ bash scripts/multi_node/sd3_fast/grpo_dino.sh
 ```bash
 # sd3 grpo with PickScore reward
 bash scripts/multi_node/sd3_fast/grpo_pickscore.sh
+
 ```
+
+## 📝 TO DO
+- Release the reference dataset used in our work  
+- Release the DINO reward checkpoint trained with GenEval and OCR prompts  
+- Release the style transfer checkpoint  
 
 
 
@@ -204,8 +210,6 @@ This repo is based on [Flow-GRPO](https://github.com/yifan123/flow_grpo.git) . W
 If you find Adv-GRPO useful for your research or projects, we would greatly appreciate it if you could cite the following paper:
 
 ```
-
-
 
 
 
