@@ -34,7 +34,6 @@ from adv_grpo.ema import EMAModuleWrapper
 from torchvision import transforms
 import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel as DDP
-from adv_grpo.grpo_discriminator import GRPOWithDiscriminator
 from adv_grpo.pickscore_scorer import PickScoreScorer
 from adv_grpo.pick_score_training import CLIPCriterionConfig, CLIPCriterion
 import timm
