@@ -161,7 +161,6 @@ Secondly,
 ```bash
 bash scripts/multi_node/sd3_fast/eval.sh 
 
-python3 inference_t2i.py --config config/grpo.py:eval_sd3_fast --prompts "a flower on a planet"
 
 ```
 You can modify the value after --prompts to try any text prompt you like.
@@ -169,12 +168,10 @@ You can modify the value after --prompts to try any text prompt you like.
 
 If you want to generate one image,
 
-
-
 ```bash
-bash run_eval.sh
+python3 inference_t2i.py --config config/grpo.py:eval_sd3_fast --prompts "a flower on a planet"
 ```
-
+You can modify the value after --prompts to try any text prompt you like.
 
 ### 4. Start Training
 
