@@ -289,10 +289,9 @@ def eval_sd3_fast():
     config.discriminator = "pickscore"
     config.d_times=10
     config.d_lr=1e-4
-    config.train.lora_path = None
     config.tune_layer=-2
 
-    config.train.lora_path = "/mnt/bn/vgfm2/test_dit/weijia/flow_grpo/logs/dino/sd3.5-M-fast_dino_cotrain_16_8_lr_times_10_1e4_patch_image_loss_73_again/checkpoints/checkpoint-858/lora"
+    config.train.lora_path = ""
     config.save_folder = "/mnt/bn/vgfm2/test_dit/weijia/outputs_flowgrpo_test2/sd3_dino_pickscore_test_1"
     config.train_d = True
     config.weight_path = None

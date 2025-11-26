@@ -150,7 +150,7 @@ def eval_sd3_fast():
 
 - `lora_path`: LoRA checkpoint path  
 - `save_folder`: Output directory  
-- `json_path`: JSON metadata file (often same as `reference_image_path`)  
+- `json_path`: JSON metadata file where each key is a prompt and each value is a list containing the file paths of the corresponding reference images.
 - `reference_image_path`: Reference images for inference (optional)  
 - `test_reference_image_path`: Test-time reference images (optional)
 
@@ -182,8 +182,8 @@ The config file is in the .config/grpo.py
 def dino_cotrain_sd3_patch_fast():
     ...
     config.json_path = ""
-    config.external_image_path = ""
-    config.test_external_image_path = ""
+    config.refernce_image_path = ""
+    config.test_reference_image_path = ""
     ...
 ```
 
@@ -214,7 +214,6 @@ bash scripts/multi_node/sd3_fast/grpo_pickscore.sh
 - Release the reference dataset used in our work  
 - Release the DINO reward checkpoint trained with GenEval and OCR prompts  
 - Release the style transfer checkpoint  
-
 
 
         

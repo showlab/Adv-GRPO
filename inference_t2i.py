@@ -9,8 +9,6 @@ import hashlib
 from absl import app, flags
 from accelerate import Accelerator
 from ml_collections import config_flags
-# from accelerate.utils import set_seed, ProjectConfiguration
-# from accelerate.logging import get_logger
 from diffusers import StableDiffusion3Pipeline
 from diffusers.utils.torch_utils import is_compiled_module
 import numpy as np
@@ -30,15 +28,9 @@ from peft import LoraConfig, get_peft_model, set_peft_model_state_dict, PeftMode
 import random
 from torch.utils.data import Dataset, DataLoader, Sampler
 from adv_grpo.ema import EMAModuleWrapper
-
 from torchvision import transforms
 import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel as DDP
-from adv_grpo.pickscore_scorer import PickScoreScorer
-from adv_grpo.pick_score_training import CLIPCriterionConfig, CLIPCriterion
-import timm
-import itertools
-from scipy import linalg
 
 tqdm = partial(tqdm.tqdm, dynamic_ncols=True)
 flags.DEFINE_string("prompts", "", "Prompt text input.")
@@ -48,7 +40,6 @@ config_flags.DEFINE_config_file("config", "config/base.py", "Training configurat
 
 
 
-criterion = CLIPCriterion(CLIPCriterionConfig())
 
 
 
@@ -71,7 +62,6 @@ def eval(pipeline, text_encoders, tokenizers, config, global_step, executor, num
     sample_neg_prompt_embeds = neg_prompt_embed.repeat(config.sample.test_batch_size*8, 1, 1)
     sample_neg_pooled_prompt_embeds = neg_pooled_prompt_embed.repeat(config.sample.test_batch_size*8, 1)
 
-    # test_dataloader = itertools.islice(test_dataloader, 2)
     all_rewards = defaultdict(list)
     idx = 0
     os.makedirs(config.save_folder, exist_ok=True)
@@ -198,10 +188,12 @@ def main(_):
             init_lora_weights="gaussian",
             target_modules=target_modules,
         )
+        
         if config.train.lora_path:
             pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, config.train.lora_path)
             # After loading with PeftModel.from_pretrained, all parameters have requires_grad set to False. You need to call set_adapter to enable gradients for the adapter parameters.
             pipeline.transformer.set_adapter("default")
+            print("load lora pretrained weight")
         else:
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
 
@@ -214,9 +206,6 @@ def main(_):
 
     if config.sample.num_image_per_prompt == 1:
         config.per_prompt_stat_tracking = False
-    # initialize stat tracker
-    if config.per_prompt_stat_tracking:
-        stat_tracker = PerPromptStatTracker(config.sample.global_std)
 
     # for some reason, autocast is necessary for non-lora training but for lora training it isn't necessary and it uses
     # more memory
