@@ -2,8 +2,6 @@
 Reinforcement Learning with Adversarial Reward for Image Generation
 
 
-
-
  </h1>
 
 <div align="center" style="font-size:14px; line-height:1.4; margin-top:10px;">
@@ -115,10 +113,10 @@ The reference images will be saved in output_dir and the json file will be like 
 
 
 
-And if you do not want to generate, you can use our reference datasets. 
+And if you do not want to generate, we will provide our reference datasets recently.
 
 
-[🤗Reference Dataset](https://huggingface.co/datasets/benzweijia/QWen_Image_PickScore) |
+<!-- [🤗Reference Dataset](https://huggingface.co/datasets/benzweijia/QWen_Image_PickScore) | -->
 
 
 Some tips:
@@ -202,9 +200,13 @@ bash scripts/multi_node/sd3_fast/grpo_pickscore.sh
 ## 🤗 Acknowledgement
 This repo is based on [Flow-GRPO](https://github.com/yifan123/flow_grpo.git) . We thank the authors for their valuable contributions to the AIGC community.
 
-## ⭐Citation
+<!-- ## ⭐Citation
 If you find Adv-GRPO useful for your research or projects, we would greatly appreciate it if you could cite the following paper:
 
 ```
 
-```
+
+
+
+
+``` -->
