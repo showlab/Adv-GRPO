@@ -123,7 +123,7 @@ Some tips:
 
 - Our reference dataset is relatively large — the full set is about 50 GB if you choose to download it.
 
-- In practice, we do not use all images during training. Similarly, not all prompts are covered when using DINO prompts.
+- In practice, we do not use all images during training. Similarly, not all prompts are covered when using DINOv2.
 
 - Based on our ablation studies, using a smaller subset of reference images and prompts can still achieve comparable performance to using the full dataset.
 
