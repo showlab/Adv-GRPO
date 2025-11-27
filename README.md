@@ -52,7 +52,7 @@ generations with reference domains
 ## Changelog
 **2025-11-27**
 
-* The Adv-GRPO demo is now available on Hugging Face: https://huggingface.co/spaces/benzweijia/Adv-GRPO !
+* The Adv-GRPO demo is now available on Hugging Face: https://huggingface.co/spaces/benzweijia/Adv-GRPO
 
 **2025-11-25**
 
