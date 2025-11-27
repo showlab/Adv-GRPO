@@ -42,8 +42,6 @@ config_flags.DEFINE_config_file("config", "config/base.py", "Training configurat
 
 
 
-
-
 def compute_text_embeddings(prompt, text_encoders, tokenizers, max_sequence_length, device):
     with torch.no_grad():
         prompt_embeds, pooled_prompt_embeds = encode_prompt(

@@ -21,8 +21,10 @@ Reinforcement Learning with Adversarial Reward for Image Generation
   <a href='https://showlab.github.io/Adv-GRPO/'><img src='https://img.shields.io/badge/Visualization-green?logo=github'></a> &nbsp;
   <a href=""><img src="https://img.shields.io/badge/Code-9E95B7?logo=github"></a> &nbsp; 
   <a href='https://huggingface.co/benzweijia/Adv-GRPO'><img src='https://img.shields.io/badge/Model-blue?logo=huggingface'></a> &nbsp; 
-  <!-- <a href='https://huggingface.co/spaces/jieliu/SD3.5-M-Flow-GRPO'><img src='https://img.shields.io/badge/Demo-blue?logo=huggingface'></a> &nbsp; -->
   <a href='https://showlab.github.io/Adv-GRPO/assets/Adv-GRPO.pdf'><img src='https://img.shields.io/badge/PDF-orange?logo=adobeacrobatreader'></a> &nbsp;
+  <a href='https://huggingface.co/spaces/benzweijia/Adv-GRPO'>
+    <img src='https://img.shields.io/badge/Demo-purple?logo=googlechrome'>
+  </a> &nbsp;
 
 </div>
 
@@ -48,6 +50,9 @@ in middle-top human evaluation results;
 generations with reference domains
 
 ## Changelog
+**2025-11-27**
+
+* The Adv-GRPO demo is now available on Hugging Face: https://huggingface.co/spaces/benzweijia/Adv-GRPO !
 
 **2025-11-25**
 
@@ -112,7 +117,6 @@ The reference images will be saved in output_dir and the json file will be like 
 ```
 
 
-
 And if you do not want to generate, we will provide our reference datasets recently.
 
 
@@ -130,11 +134,9 @@ Some tips:
 - If you prefer not to use our dataset or have a better alternative, you can use your own dataset and simply adapt it to the required format.
 
 
-
 ### 2. Inferece Stage.
 
 Firstly, we set the config file  .config/grpo.py
-
 
 ``` python
 def eval_sd3_fast():
@@ -153,7 +155,6 @@ def eval_sd3_fast():
 - `json_path`: JSON metadata file where each key is a prompt and each value is a list containing the file paths of the corresponding reference images.
 - `reference_image_path`: Reference images for inference (optional)  
 - `test_reference_image_path`: Test-time reference images (optional)
-
 
 
 Secondly, 
@@ -224,11 +225,17 @@ bash scripts/multi_node/sd3_fast/grpo_pickscore.sh
 ## 🤗 Acknowledgement
 This repo is based on [Flow-GRPO](https://github.com/yifan123/flow_grpo.git) . We thank the authors for their valuable contributions to the AIGC community.
 
-<!-- ## ⭐Citation
+## ⭐Citation
 If you find Adv-GRPO useful for your research or projects, we would greatly appreciate it if you could cite the following paper:
 
 ```
+@article{mao2024image_reward,
+  title={The Image as Its Own Reward: Reinforcement Learning with Adversarial Reward for Image Generation},
+  author={Weijia Mao, Hao Chen, Zhenheng Yang, Mike Zheng Shou},
+  journal={},
+  year={2025},
+  institution={Show Lab, National University of Singapore and ByteDance}
+}
 
 
-
-``` -->
+```
