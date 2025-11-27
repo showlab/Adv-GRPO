@@ -54,6 +54,9 @@ generations with reference domains
 
 **2025-11-27**
 
+* We also released our reference datasets. 
+  - [QWen_Image_PickScore](https://huggingface.co/datasets/benzweijia/QWen_Image_PickScore/resolve/main/images.tar?download=true)
+
 * The Adv-GRPO demo is now available on Hugging Face: 
   - [PickScore](https://huggingface.co/spaces/benzweijia/Adv-GRPO)
   - [DINOv2](https://huggingface.co/spaces/benzweijia/Adv-GRPO_DINO)
