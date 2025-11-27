@@ -205,13 +205,13 @@ accelerate launch --config_file scripts/accelerate_configs/deepspeed_zero3.yaml
 Single-node training:
 ```bash
 # sd3 grpo with DINO reward
-bash scripts/multi_node/sd3_fast/grpo_dino.sh
+bash scripts/grpo_dino.sh
 ```
 
 
 ```bash
 # sd3 grpo with PickScore reward
-bash scripts/multi_node/sd3_fast/grpo_pickscore.sh
+bash scripts/grpo_pickscore.sh
 
 ```
 
