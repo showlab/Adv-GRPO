@@ -65,6 +65,11 @@ generations with reference domains
 <!-- 
 ## FAQ -->
 
+## 📝 TO DO
+- [ ] Release the reference dataset used in our work  
+- [ ] Release the DINO reward checkpoint trained with GenEval and OCR prompts  
+- [ ] Release the style transfer checkpoint  
+- [ ] Try more base models like QWen-Image
 
 ## 🤗 Model
 | Task    | Model |
@@ -121,7 +126,7 @@ The reference images will be saved in output_dir and the json file will be like 
 ```
 
 
-And if you do not want to generate, we will provide our reference datasets recently.
+And if you do not want to generate, you can use our generated images: [🤗QWen_PickScore](https://huggingface.co/datasets/benzweijia/QWen_Image_PickScore/resolve/main/images.tar?download=true)
 
 
 <!-- [🤗Reference Dataset](https://huggingface.co/datasets/benzweijia/QWen_Image_PickScore) | -->
@@ -129,11 +134,11 @@ And if you do not want to generate, we will provide our reference datasets recen
 
 Some tips:
 
-- Our reference dataset is relatively large — the full set is about 50 GB if you choose to download it.
+- Our reference dataset is relatively large — the full set is about 60 GB if you choose to download it.
 
-- In practice, we do not use all images during training. Similarly, not all prompts are covered when using DINOv2.
+- Actually, we do not use all images during training. Similarly, not all prompts are covered when using DINOv2.
 
-- Based on our ablation studies, using a smaller subset of reference images and prompts can still achieve comparable performance to using the full dataset.
+- Based on our ablation studies, using a smaller subset of reference images and prompts can still achieve comparable performance to using the full dataset when observing the DINO similarity.
 
 - If you prefer not to use our dataset or have a better alternative, you can use your own dataset and simply adapt it to the required format.
 
@@ -215,11 +220,6 @@ bash scripts/grpo_pickscore.sh
 
 ```
 
-## 📝 TO DO
-- Release the reference dataset used in our work  
-- Release the DINO reward checkpoint trained with GenEval and OCR prompts  
-- Release the style transfer checkpoint  
-- Try more base models like QWen-Image
 
 
         
