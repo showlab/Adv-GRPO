@@ -219,6 +219,7 @@ bash scripts/grpo_pickscore.sh
 - Release the reference dataset used in our work  
 - Release the DINO reward checkpoint trained with GenEval and OCR prompts  
 - Release the style transfer checkpoint  
+- Try more base models like QWen-Image
 
 
         
