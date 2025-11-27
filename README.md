@@ -55,8 +55,8 @@ generations with reference domains
 **2025-11-27**
 
 * The Adv-GRPO demo is now available on Hugging Face: 
-  - PickScore: https://huggingface.co/spaces/benzweijia/Adv-GRPO
-  - DINOv2: https://huggingface.co/spaces/benzweijia/Adv-GRPO_DINO
+  - [PickScore](https://huggingface.co/spaces/benzweijia/Adv-GRPO)
+  - [DINOv2](https://huggingface.co/spaces/benzweijia/Adv-GRPO_DINO)
 
 **2025-11-25**
 
