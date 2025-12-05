@@ -237,12 +237,11 @@ This repo is based on [Flow-GRPO](https://github.com/yifan123/flow_grpo.git) . W
 If you find Adv-GRPO useful for your research or projects, we would greatly appreciate it if you could cite the following paper:
 
 ```
-@article{mao2024image_reward,
+@article{mao2025image,
   title={The Image as Its Own Reward: Reinforcement Learning with Adversarial Reward for Image Generation},
-  author={Weijia Mao, Hao Chen, Zhenheng Yang, Mike Zheng Shou},
-  journal={},
-  year={2025},
-  institution={Show Lab, National University of Singapore and ByteDance}
+  author={Mao, Weijia and Chen, Hao and Yang, Zhenheng and Shou, Mike Zheng},
+  journal={arXiv preprint arXiv:2511.20256},
+  year={2025}
 }
 
 
