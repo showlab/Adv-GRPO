@@ -51,6 +51,12 @@ generations with reference domains
 
 ## Changelog
 
+**2025-12-15**
+
+* Released the checkpoints trained with OCR and GenEval prompts under the DINO reward framework:
+  - [DINO_OCR](https://huggingface.co/benzweijia/Adv-GRPO/tree/main/DINO_OCR)
+  - [DINO_GENEVAL](https://huggingface.co/benzweijia/Adv-GRPO/tree/main/DINO_GENEVAL)
+
 
 **2025-11-27**
 
@@ -69,8 +75,8 @@ generations with reference domains
 ## FAQ -->
 
 ## 📝 TO DO
-- [ ] Release the reference dataset used in our work  
-- [ ] Release the DINO reward checkpoint trained with GenEval and OCR prompts  
+- [x] Release the reference dataset used in our work  
+- [x] Release the DINO reward checkpoint trained with GenEval and OCR prompts  
 - [ ] Release the style transfer checkpoint  
 - [ ] Try more base models like QWen-Image
 
