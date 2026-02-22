@@ -49,7 +49,11 @@ in middle-top human evaluation results;
  3) RL-based Distribution Transfer, enabling style customization by aligning
 generations with reference domains
 
-## Changelog
+## News
+
+**2025-2-21**
+
+🎉 Our paper Adv-GRPO has been accepted to CVPR 2026 (Main Conference / Main Track)! 
 
 **2025-12-15**
 
