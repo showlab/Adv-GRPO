@@ -51,7 +51,7 @@ generations with reference domains
 
 ## News
 
-**2025-2-21**
+**2026-2-21**
 
 🎉 Our paper Adv-GRPO has been accepted to CVPR 2026 (Main Conference / Main Track)! 
 
